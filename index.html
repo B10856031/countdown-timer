@@ -95,7 +95,7 @@
     .field{display:grid;gap:7px;margin:12px 0}
     .field label,.field-label{font-weight:750;color:#46536a;font-size:.88rem}
     .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .field input[type="text"],.field input[type="number"],.field select,.reminder-card input,.reminder-card select,.quick-editor input,.quick-editor select{width:100%;min-height:42px;border:1px solid #d8e1ef;border-radius:11px;padding:8px 10px;background:#fff;color:var(--ink)}
+    .field input[type="text"],.field input[type="password"],.field input[type="url"],.field input[type="number"],.field select,.reminder-card input,.reminder-card select,.quick-editor input,.quick-editor select{width:100%;min-height:42px;border:1px solid #d8e1ef;border-radius:11px;padding:8px 10px;background:#fff;color:var(--ink)}
     .field input[type="range"]{width:100%;accent-color:var(--accent)}
     .field input[type="color"]{width:100%;height:42px;border:1px solid #d8e1ef;border-radius:11px;padding:4px;background:#fff}
     .check-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:9px 0;font-size:.9rem;font-weight:700;color:#46536a}
@@ -248,9 +248,9 @@
 <body>
   <main class="app" id="app">
     <header class="topbar">
-      <div class="status-pill" id="dbStatus"><span class="status-dot"></span><span>CSV尚未連結</span></div>
+      <div class="status-pill" id="dbStatus"><span class="status-dot"></span><span>雲端連線中</span></div>
       <div class="top-actions">
-        <button class="icon-btn" id="dbButton" type="button" aria-label="連結CSV資料庫">↗</button>
+        <button class="icon-btn" id="dbButton" type="button" aria-label="重新從雲端載入" title="重新從雲端載入">⟳</button>
         <button class="icon-btn" id="settingsButton" type="button" aria-label="開啟設定">⚙</button>
       </div>
     </header>
@@ -383,7 +383,7 @@
           </div>
           <div class="section">
             <h3>自訂音訊庫</h3>
-            <p class="section-note">支援常見音訊格式，單檔建議不超過15MB。音訊會編碼後存入CSV。</p>
+            <p class="section-note">支援常見音訊格式，單檔上限8MB，音訊會編碼後存入雲端CSV。</p>
             <label class="upload-box">＋上傳自訂音訊<input id="soundUpload" type="file" accept="audio/*" multiple></label>
             <div id="customSoundList"></div>
           </div>
@@ -426,16 +426,19 @@
 
         <section class="tab-panel" data-panel="database">
           <div class="section db-card">
-            <h3>CSV資料庫</h3>
-            <div class="db-state" id="drawerDbStatus">尚未連結資料夾。目前設定會先保存在此裝置。</div>
-            <button class="full-btn" id="connectDbButton" type="button">連結資料庫資料夾</button>
-            <button class="full-btn secondary" id="saveDbButton" type="button">立即儲存CSV</button>
+            <h3>雲端CSV資料庫（Google 雲端硬碟）</h3>
+            <div class="db-state" id="drawerDbStatus">尚未設定雲端。目前設定會先保存在此裝置。</div>
+            <div class="field" style="margin:4px 0"><label for="cloudUrl">Apps Script 網址（/exec 結尾）</label><input id="cloudUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></div>
+            <div class="field" style="margin:4px 0"><label for="cloudKey">連線密碼</label><input id="cloudKey" type="password" autocomplete="off"></div>
+            <button class="full-btn" id="connectDbButton" type="button">儲存並連線雲端</button>
+            <button class="full-btn secondary" id="saveDbButton" type="button">立即儲存到雲端</button>
+            <button class="full-btn secondary" id="reloadCloudButton" type="button">重新從雲端載入</button>
             <button class="full-btn secondary" id="downloadDbButton" type="button">下載CSV備份</button>
             <label class="upload-box">匯入CSV備份<input id="importCsvInput" type="file" accept=".csv,text/csv"></label>
           </div>
           <div class="section">
             <h3>資料說明</h3>
-            <p class="section-note">首次連結時請選擇「倒數計時器.html」所在資料夾。若找不到「倒數計時器-資料庫.csv」，系統會自動建立。Android瀏覽器若清除網站權限，需再次點擊連結。</p>
+            <p class="section-note">設定會自動讀寫你 Google 雲端硬碟「倒數計時器-資料」資料夾中的「倒數計時器-資料庫.csv」。網址與密碼只保存在這台裝置，不會寫進CSV。第一次連線時，若雲端已有資料會以雲端為準；若雲端是空的，會把此裝置目前的設定上傳。</p>
           </div>
         </section>
       </div>
@@ -489,9 +492,6 @@
 
     const DB_NAME = "倒數計時器-資料庫.csv";
     const LOCAL_KEY = "countdownTimerConfigV1";
-    const HANDLE_DB = "countdownTimerHandleDb";
-    const HANDLE_STORE = "handles";
-    const HANDLE_KEY = "databaseDirectory";
 
     const DEFAULT_CONFIG = {
       version: 5,
@@ -625,8 +625,11 @@
       selectedKey: "panel",
       drag: null,
       quickDrag: null,
-      directoryHandle: null,
-      fileHandle: null,
+      cloud: { url: "", key: "" },
+      cloudReady: false,
+      cloudLoading: false,
+      cloudRev: null,
+      lastSavedPayload: "",
       saveTimer: 0,
       saving: false,
       pendingSave: false,
@@ -1884,17 +1887,20 @@
       if (!selected.length) return;
       await ensureAudioContext();
       for (const file of selected) {
-        if (file.size > 15 * 1024 * 1024) {
-          showToast(`${file.name}超過15MB，已略過`, 3600);
+        if (file.size > 8 * 1024 * 1024) {
+          showToast(`${file.name}超過8MB，已略過`, 3600);
           continue;
         }
         showToast(`正在加入${file.name}`);
         try {
           const encoded = await compressAudioFile(file);
-          state.config.customSounds.push({
+          const sound = {
             id: uniqueId("sound"), name: file.name, type: file.type || "audio/*",
             originalSize: file.size, encoding: encoded.encoding, data: encoded.data
-          });
+          };
+          state.config.customSounds.push(sound);
+          renderCustomSounds();
+          if (state.cloudReady) { showToast(`正在上傳${file.name}到雲端…`, 8000); await uploadSoundToCloud(sound); }
         } catch (_) {
           showToast(`${file.name}讀取失敗`);
         }
@@ -1903,14 +1909,15 @@
       renderSoundSelectors();
       renderContinuousEditor();
       scheduleSave();
-      if (!state.fileHandle) showToast("音訊已加入，請連結CSV或下載備份以永久保存", 4200);
-      else showToast("自訂音訊已加入並儲存");
+      if (!state.cloudReady) showToast("音訊已加入，但尚未連線雲端；重新整理後會消失，請先下載CSV備份", 5200);
+      else showToast("自訂音訊已加入並儲存到雲端");
     }
 
     function removeCustomSound(id) {
       const sound = state.config.customSounds.find(item => item.id === id);
       if (!sound) return;
       state.config.customSounds = state.config.customSounds.filter(item => item.id !== id);
+      if (state.cloudReady) cloudCall("deleteSound", { id }).then(acceptRev).catch(error => showToast(`雲端刪除音訊失敗：${error.message}`, 3600));
       const url = state.audioUrls.get(id);
       if (url) URL.revokeObjectURL(url);
       state.audioUrls.delete(id);
@@ -1998,120 +2005,213 @@
       } catch (_) { state.config = clone(DEFAULT_CONFIG); }
     }
 
+    const CLOUD_SETTINGS_KEY = "countdownTimerCloudSettings";
+    const CLOUD_DIRTY_KEY = "countdownTimerCloudDirty";
+
+    function readCloudSettings() {
+      try {
+        const value = JSON.parse(localStorage.getItem(CLOUD_SETTINGS_KEY) || "{}");
+        return { url: String(value.url || ""), key: String(value.key || ""), rev: value.rev ?? null };
+      } catch (_) { return { url: "", key: "", rev: null }; }
+    }
+
+    function writeCloudSettings() {
+      try { localStorage.setItem(CLOUD_SETTINGS_KEY, JSON.stringify({ url: state.cloud.url, key: state.cloud.key, rev: state.cloudRev })); } catch (_) { /* Optional. */ }
+    }
+
+    function setDirty(value) {
+      try { if (value) localStorage.setItem(CLOUD_DIRTY_KEY, "1"); else localStorage.removeItem(CLOUD_DIRTY_KEY); } catch (_) { /* Optional. */ }
+    }
+
+    function isDirtyStored() {
+      try { return localStorage.getItem(CLOUD_DIRTY_KEY) === "1"; } catch (_) { return false; }
+    }
+
+    const cloudConfigured = () => /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/(exec|dev)$/.test(state.cloud.url) && state.cloud.key.length > 0;
+
+    async function cloudCall(action, data = {}) {
+      if (!cloudConfigured()) throw new Error("尚未設定雲端網址與密碼");
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000);
+      try {
+        // 不加自訂標頭：以 text/plain 傳送，瀏覽器不會發出 CORS 預檢請求。
+        const response = await fetch(state.cloud.url, {
+          method: "POST", redirect: "follow", cache: "no-store", signal: controller.signal,
+          body: JSON.stringify({ ...data, action, key: state.cloud.key })
+        });
+        const text = await response.text();
+        let result;
+        try { result = JSON.parse(text); }
+        catch (_) { throw new Error("雲端回應不是預期格式，請確認網址正確，且部署的存取權為「任何人」"); }
+        if (!result.ok) throw new Error(result.error || "雲端發生錯誤");
+        return result;
+      } catch (error) {
+        if (error.name === "AbortError") throw new Error("雲端連線逾時");
+        if (error instanceof TypeError) throw new Error("無法連線雲端，請確認網路與網址");
+        throw error;
+      } finally { clearTimeout(timer); }
+    }
+
+    function acceptRev(result) {
+      if (result && result.rev != null) { state.cloudRev = result.rev; writeCloudSettings(); }
+    }
+
+    function configPayload() {
+      const payload = clone(state.config);
+      delete payload.customSounds;
+      return JSON.stringify(payload);
+    }
+
     function scheduleSave() {
       saveLocalBackup();
+      if (cloudConfigured() && configPayload() !== state.lastSavedPayload) setDirty(true);
       clearTimeout(state.saveTimer);
-      state.saveTimer = setTimeout(saveNow, 550);
+      state.saveTimer = setTimeout(saveNow, 1000);
     }
 
     async function saveNow() {
       clearTimeout(state.saveTimer);
       saveLocalBackup();
-      if (!state.fileHandle) { updateDbStatus("local"); return; }
+      if (!state.cloudReady) { if (!state.cloudLoading) updateDbStatus(cloudConfigured() ? "error" : "local"); return; }
       if (state.saving) { state.pendingSave = true; return; }
       state.saving = true;
       try {
         do {
           state.pendingSave = false;
-          const writable = await state.fileHandle.createWritable();
-          await writable.write(serializeDatabase());
-          await writable.close();
+          const payload = configPayload();
+          if (payload !== state.lastSavedPayload) {
+            updateDbStatus("saving");
+            acceptRev(await cloudCall("saveConfig", { config: payload }));
+            state.lastSavedPayload = payload;
+          }
         } while (state.pendingSave);
+        if (configPayload() === state.lastSavedPayload) setDirty(false);
         updateDbStatus("connected");
-      } catch (_) {
+      } catch (error) {
         updateDbStatus("error");
-        showToast("CSV儲存失敗，請重新連結資料夾", 3600);
+        showToast(`雲端儲存失敗：${error.message}`, 3600);
       } finally { state.saving = false; }
     }
 
     function updateDbStatus(mode) {
       const dot = $(".status-dot", elements.dbStatus);
       const label = $("span:last-child", elements.dbStatus);
-      if (mode === "connected") {
-        dot.style.background = "#45b982";
-        label.textContent = "CSV已連結";
-        elements.drawerDbStatus.textContent = `已連結${DB_NAME}，所有設定將自動寫入。`;
-      } else if (mode === "error") {
-        dot.style.background = "#ec6269";
-        label.textContent = "CSV需要重新連結";
-        elements.drawerDbStatus.textContent = "資料庫權限已失效，請重新選擇資料夾。設定仍暫存在此裝置。";
-      } else {
-        dot.style.background = "#f0a54a";
-        label.textContent = "CSV尚未連結";
-        elements.drawerDbStatus.textContent = "尚未連結資料夾。目前設定會先保存在此裝置。";
+      const modes = {
+        connected: ["#45b982", "雲端已同步", "已連線 Google 雲端硬碟，所有設定會自動儲存。"],
+        saving: ["#4f7df3", "雲端同步中", "正在與 Google 雲端硬碟同步…"],
+        error: ["#ec6269", "雲端未連線", "無法連線雲端，設定暫存在此裝置，恢復連線後會再同步。可按「重新從雲端載入」重試。"],
+        local: ["#f0a54a", "尚未設定雲端", "尚未設定雲端。請填入 Apps Script 網址與密碼；在那之前設定只保存在此裝置。"]
+      };
+      const [color, text, detail] = modes[mode] || modes.local;
+      dot.style.background = color;
+      label.textContent = text;
+      elements.drawerDbStatus.textContent = detail;
+    }
+
+    async function uploadSoundToCloud(sound) {
+      if (!state.cloudReady) return false;
+      try { acceptRev(await cloudCall("saveSound", { sound: JSON.stringify(sound) })); return true; }
+      catch (error) { showToast(`${sound.name}上傳雲端失敗：${error.message}`, 4200); return false; }
+    }
+
+    async function syncAllToCloud() {
+      if (!state.cloudReady) return false;
+      try {
+        updateDbStatus("saving");
+        const payload = configPayload();
+        acceptRev(await cloudCall("replaceAll", { csv: serializeDatabase() }));
+        state.lastSavedPayload = payload;
+        setDirty(false);
+        updateDbStatus("connected");
+        return true;
+      } catch (error) {
+        updateDbStatus("error");
+        showToast(`雲端同步失敗：${error.message}`, 4200);
+        return false;
       }
     }
 
-    function openHandleDatabase() {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(HANDLE_DB, 1);
-        request.onupgradeneeded = () => request.result.createObjectStore(HANDLE_STORE);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
+    function applyCloudCsv(csv) {
+      state.audioUrls.forEach(url => URL.revokeObjectURL(url));
+      state.audioUrls.clear();
+      state.config = parseDatabase(csv);
+      if (!state.running) {
+        state.remainingMs = state.config.durationMs;
+        state.totalMs = Math.max(state.remainingMs, 1);
+      }
+      applyAllConfig();
+      state.lastSavedPayload = configPayload();
+      saveLocalBackup();
     }
 
-    async function storeDirectoryHandle(handle) {
+    async function loadFromCloud(announce = false) {
+      if (!cloudConfigured()) { state.cloudReady = false; updateDbStatus("local"); return; }
+      if (state.cloudLoading) return;
+      if (state.cloudReady && configPayload() !== state.lastSavedPayload) await saveNow();
+      state.cloudLoading = true;
+      updateDbStatus("saving");
       try {
-        const db = await openHandleDatabase();
-        const transaction = db.transaction(HANDLE_STORE, "readwrite");
-        transaction.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
-      } catch (_) { /* Reconnection remains available manually. */ }
+        const info = await cloudCall("info");
+        const localDirty = isDirtyStored();
+        if (localDirty && info.hasData) {
+          const cloudChanged = String(info.rev) !== String(state.cloudRev);
+          const keepLocal = !cloudChanged || !confirm("這台裝置有尚未同步的修改，但雲端資料也被其他裝置更新過。\n\n按「確定」：改用雲端版本（此裝置未同步的修改會捨棄）\n按「取消」：用此裝置的設定覆蓋雲端（自訂音訊以雲端為準）");
+          if (keepLocal) acceptRev(await cloudCall("saveConfig", { config: configPayload() }));
+        }
+        const result = await cloudCall("load");
+        state.cloudReady = true;
+        if (result.csv && result.csv.trim()) {
+          applyCloudCsv(result.csv);
+          acceptRev(result);
+          setDirty(false);
+          updateDbStatus("connected");
+          if (announce) showToast("已從雲端載入設定");
+        } else {
+          acceptRev(result);
+          if (await syncAllToCloud() && announce) showToast("雲端是空的，已上傳此裝置的設定");
+        }
+      } catch (error) {
+        state.cloudReady = false;
+        updateDbStatus("error");
+        showToast(`無法讀取雲端資料：${error.message}`, 4200);
+      } finally { state.cloudLoading = false; }
     }
 
-    async function restoreDirectoryHandle() {
+    // 回到此分頁時，若其他裝置改過雲端資料，就自動載入最新版本。
+    async function checkCloudUpdate() {
+      if (!state.cloudReady || state.cloudLoading || state.saving || state.running) return;
+      if (configPayload() !== state.lastSavedPayload) { void saveNow(); return; }
       try {
-        const db = await openHandleDatabase();
-        const handle = await new Promise((resolve, reject) => {
-          const request = db.transaction(HANDLE_STORE, "readonly").objectStore(HANDLE_STORE).get(HANDLE_KEY);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-        if (!handle) return;
-        if (typeof handle.queryPermission !== "function") return;
-        const permission = await handle.queryPermission({ mode: "readwrite" });
-        if (permission === "granted") await attachDirectory(handle, false);
-      } catch (_) { /* Browser may not persist handles. */ }
+        const info = await cloudCall("info");
+        if (String(info.rev) !== String(state.cloudRev)) {
+          await loadFromCloud(false);
+          showToast("已載入其他裝置的最新設定");
+        }
+      } catch (_) { /* 下次再檢查 */ }
     }
 
-    async function attachDirectory(handle, announce = true) {
-      state.directoryHandle = handle;
-      state.fileHandle = await handle.getFileHandle(DB_NAME, { create: true });
-      const file = await state.fileHandle.getFile();
-      if (file.size > 0) {
-        try {
-          state.config = parseDatabase(await file.text());
-          if (!state.running) {
-            state.remainingMs = state.config.durationMs;
-            state.totalMs = Math.max(state.remainingMs, 1);
-          }
-          applyAllConfig();
-        } catch (error) {
-          showToast(`CSV讀取失敗：${error.message}`, 4200);
-          state.fileHandle = null;
-          updateDbStatus("error");
+    function connectDatabase(event) {
+      const fromDrawer = event?.currentTarget?.id === "connectDbButton";
+      if (fromDrawer) {
+        state.cloud.url = $("#cloudUrl").value.trim();
+        state.cloud.key = $("#cloudKey").value.trim();
+        if (!cloudConfigured()) {
+          showToast("請填入正確的 Apps Script 網址（…/exec）與密碼", 4200);
           return;
         }
-      }
-      await saveNow();
-      await storeDirectoryHandle(handle);
-      updateDbStatus("connected");
-      if (announce) showToast("CSV資料庫已連結");
-    }
-
-    async function connectDatabase() {
-      if (!("showDirectoryPicker" in window)) {
-        switchTab("database");
-        setEditing(true);
-        showToast("此瀏覽器不支援資料夾直接寫入，請使用下載CSV備份", 4400);
+        state.cloudReady = false;
+        state.cloudRev = null;
+        writeCloudSettings();
+        void loadFromCloud(true);
         return;
       }
-      try {
-        const handle = await window.showDirectoryPicker({ id: "countdown-timer", mode: "readwrite" });
-        await attachDirectory(handle, true);
-      } catch (error) {
-        if (error && error.name !== "AbortError") showToast("無法連結資料夾，請確認瀏覽器檔案權限");
+      if (!cloudConfigured()) {
+        setEditing(true);
+        switchTab("database");
+        showToast("請先填入 Apps Script 網址與密碼");
+        return;
       }
+      void loadFromCloud(true);
     }
 
     function downloadDatabase() {
@@ -2127,14 +2227,18 @@
 
     async function importDatabase(file) {
       try {
+        state.audioUrls.forEach(url => URL.revokeObjectURL(url));
+        state.audioUrls.clear();
         state.config = parseDatabase(await file.text());
         if (!state.running) {
           state.remainingMs = state.config.durationMs;
           state.totalMs = Math.max(state.remainingMs, 1);
         }
         applyAllConfig();
-        scheduleSave();
-        showToast("CSV設定已匯入");
+        saveLocalBackup();
+        if (!state.cloudReady) { showToast("CSV設定已匯入（尚未連線雲端）", 3600); return; }
+        showToast("CSV設定已匯入，正在上傳雲端…");
+        if (await syncAllToCloud()) showToast("CSV設定已匯入並同步雲端");
       } catch (error) { showToast(`無法匯入CSV：${error.message}`, 4200); }
     }
 
@@ -2272,7 +2376,8 @@
       elements.closeSettingsButton.addEventListener("click", () => setEditing(false));
       elements.dbButton.addEventListener("click", connectDatabase);
       $("#connectDbButton").addEventListener("click", connectDatabase);
-      $("#saveDbButton").addEventListener("click", async () => { await saveNow(); showToast(state.fileHandle ? "CSV已儲存" : "尚未連結CSV，已保存在此裝置"); });
+      $("#saveDbButton").addEventListener("click", async () => { await saveNow(); showToast(state.cloudReady ? "已儲存到雲端" : "尚未連線雲端，已保存在此裝置"); });
+      $("#reloadCloudButton").addEventListener("click", () => { if (!cloudConfigured()) showToast("請先填入 Apps Script 網址與密碼"); else void loadFromCloud(true); });
       $("#downloadDbButton").addEventListener("click", downloadDatabase);
       $("#importCsvInput").addEventListener("change", event => { if (event.target.files[0]) importDatabase(event.target.files[0]); event.target.value = ""; });
       $("#soundUpload").addEventListener("change", event => { handleSoundUpload(event.target.files); event.target.value = ""; });
@@ -2322,7 +2427,7 @@
         state.config = clone(DEFAULT_CONFIG);
         state.remainingMs = state.config.durationMs;
         state.totalMs = state.remainingMs;
-        applyAllConfig(); scheduleSave(); showToast("已恢復預設設定");
+        applyAllConfig(); saveLocalBackup(); void syncAllToCloud(); showToast("已恢復預設設定");
       });
       $$(".tab-btn").forEach(button => button.addEventListener("click", () => switchTab(button.dataset.tab)));
       elements.quickRow.addEventListener("click", event => {
@@ -2363,6 +2468,13 @@
         if (event.key === "Enter" && elements.timeEditorOverlay.classList.contains("show") && event.target.matches("#directHours,#directMinutes,#directSeconds,#directMilliseconds")) applyDirectTime();
       });
       window.addEventListener("beforeunload", saveLocalBackup);
+      window.addEventListener("pagehide", () => { if (state.cloudReady) void saveNow(); });
+      window.addEventListener("online", () => { if (state.cloudReady) void saveNow(); else if (cloudConfigured()) void loadFromCloud(false); });
+      window.addEventListener("focus", () => { void checkCloudUpdate(); });
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden" && state.cloudReady) void saveNow();
+        if (document.visibilityState === "visible") void checkCloudUpdate();
+      });
       const unlockAudio = () => { void ensureAudioContext(); };
       ["pointerdown", "keydown", "touchstart"].forEach(name => document.addEventListener(name, unlockAudio, { capture: true, passive: true }));
       document.addEventListener("keydown", event => {
@@ -2684,8 +2796,13 @@
       state.totalMs = Math.max(state.remainingMs, 1);
       applyAllConfig();
       bindEvents();
-      updateDbStatus("local");
-      restoreDirectoryHandle();
+      const cloudSettings = readCloudSettings();
+      state.cloud = { url: cloudSettings.url, key: cloudSettings.key };
+      state.cloudRev = cloudSettings.rev;
+      $("#cloudUrl").value = state.cloud.url;
+      $("#cloudKey").value = state.cloud.key;
+      updateDbStatus(cloudConfigured() ? "saving" : "local");
+      void loadFromCloud(false);
       registerWebMcpTools();
       setInterval(() => { if (state.running && document.hidden) tick(performance.now()); }, 500);
     }
