@@ -1,0 +1,2676 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4f8ff">
+  <title>倒數計時器</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg:#f4f8ff;
+      --panel:#ffffff;
+      --ink:#17233c;
+      --muted:#6e7b92;
+      --accent:#4f7df3;
+      --accent-strong:#315fcf;
+      --accent-soft:#e8efff;
+      --primary-text:#ffffff;
+      --quick-text:#315fcf;
+      --focus-bg:#f1f5fb;
+      --focus-text:#17233c;
+      --danger:#ec6269;
+      --track:#e8edf5;
+      --shadow:0 24px 70px rgba(55,87,148,.14);
+      --radius:34px;
+      --title-size:clamp(2rem,3.3vw,4.4rem);
+      --time-size:clamp(5rem,12vw,14rem);
+      --ms-scale:.5;
+      --button-radius:18px;
+      --quick-size:20px;
+      --action-size:24px;
+      --font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{min-height:100%;margin:0}
+    body{background:var(--bg);color:var(--ink);font-family:var(--font-family);overflow-x:hidden}
+    button,input,select{font:inherit}
+    button{touch-action:manipulation}
+    .app{min-height:100vh;min-height:100dvh;padding:clamp(18px,3vw,44px);display:grid;place-items:center;position:relative}
+    .topbar{position:fixed;z-index:20;top:max(18px,env(safe-area-inset-top));left:clamp(18px,3vw,44px);right:clamp(18px,3vw,44px);display:flex;align-items:center;justify-content:space-between;pointer-events:none}
+    .top-actions{display:flex;gap:10px;pointer-events:auto}
+    .status-pill{pointer-events:auto;display:flex;align-items:center;gap:9px;padding:10px 14px;border:1px solid rgba(79,125,243,.16);border-radius:999px;background:rgba(255,255,255,.82);box-shadow:0 8px 26px rgba(55,87,148,.08);backdrop-filter:blur(14px);color:var(--muted);font-size:.92rem;font-weight:700}
+    .status-dot{width:9px;height:9px;border-radius:50%;background:#f0a54a;box-shadow:0 0 0 5px rgba(240,165,74,.14)}
+    .icon-btn{width:48px;height:48px;border:1px solid rgba(79,125,243,.16);border-radius:16px;background:rgba(255,255,255,.88);box-shadow:0 8px 26px rgba(55,87,148,.09);color:var(--ink);cursor:pointer;display:grid;place-items:center;font-size:1.25rem}
+    .timer-card{width:min(1500px,94vw);min-height:min(820px,86vh);padding:clamp(42px,5vw,80px);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow);border:1px solid rgba(79,125,243,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(24px,3vh,38px);position:relative;overflow:hidden}
+    .timer-card::before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:7px;background:linear-gradient(90deg,#8cb6ff,var(--accent),#89d8dc)}
+    .timer-title{font-size:var(--title-size);line-height:1.15;margin:0;font-weight:800;letter-spacing:.08em;text-align:center}
+    .time-display{font-variant-numeric:tabular-nums lining-nums;white-space:nowrap;line-height:.88;font-size:var(--time-size);font-weight:760;letter-spacing:-.055em;color:var(--ink);text-align:center;cursor:text}
+    .time-display .milliseconds{font-size:calc(1em * var(--ms-scale));letter-spacing:-.02em;color:var(--accent);vertical-align:baseline}
+    .progress-wrap{width:min(1120px,86vw)}
+    .progress-track{height:clamp(18px,2.1vw,28px);border-radius:999px;background:var(--track);position:relative;box-shadow:inset 0 2px 5px rgba(41,58,93,.08)}
+    .progress-fill{position:absolute;inset:0;width:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent-strong),var(--accent),#7ca4ff);box-shadow:0 0 24px rgba(79,125,243,.38);transform:scaleX(var(--progress-ratio,1));transform-origin:left center;transition:transform .08s linear;will-change:transform;overflow:hidden}
+    .progress-fill::before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 0 35%,rgba(255,255,255,.38) 45%,transparent 55% 100%);background-size:240px 100%;animation:none}
+    body.counting .progress-fill::before{animation:progressFlow 2.8s linear infinite}
+    .progress-marker{position:absolute;z-index:2;top:50%;left:calc(var(--progress-ratio,1) * 100%);width:calc(clamp(18px,2.1vw,28px) + 8px);height:calc(clamp(18px,2.1vw,28px) + 8px);border:5px solid #fff;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(79,125,243,.2),0 5px 15px rgba(49,95,207,.3);transform:translate(-50%,-50%);transition:left .08s linear;will-change:left}
+    .progress-meta{display:flex;justify-content:space-between;align-items:center;margin-top:12px;color:var(--muted);font-size:.88rem;font-weight:800;font-variant-numeric:tabular-nums}
+    @keyframes progressFlow{to{background-position:240px 0}}
+    .quick-row{display:flex;justify-content:center;flex-wrap:wrap;gap:12px}
+    .quick-btn,.primary-btn,.focus-btn{border:0;border-radius:var(--button-radius);font-weight:800;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+    .quick-btn{min-width:116px;padding:17px 22px;background:var(--accent-soft);color:var(--quick-text);font-size:var(--quick-size)}
+    .quick-btn:active,.primary-btn:active,.focus-btn:active{transform:scale(.975)}
+    .action-stack{display:flex;flex-direction:column;align-items:stretch;gap:12px;width:min(470px,78vw)}
+    .primary-btn{padding:21px 34px;background:var(--accent);color:var(--primary-text);font-size:var(--action-size);box-shadow:0 14px 30px rgba(79,125,243,.25)}
+    .focus-btn{padding:15px 28px;background:var(--focus-bg);color:var(--focus-text);font-size:calc(var(--action-size) * .72)}
+    .timer-card.style-border{box-shadow:none;border:3px solid var(--accent-soft)}
+    .timer-card.style-flat{box-shadow:none;border:0}
+    .timer-card.style-glass{background:color-mix(in srgb,var(--panel) 76%,transparent);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.8)}
+    .hidden{display:none!important}
+    .timer-title,.time-display,.progress-wrap,.quick-row,.action-stack,.timer-card{transform:translate(var(--move-x,0px),var(--move-y,0px))}
+    body.editing .app{grid-template-columns:minmax(0,1fr) 420px;place-items:center stretch;gap:22px;background:#eef4ff}
+    body.editing .timer-card{grid-column:1;grid-row:1;width:100%!important;max-width:none}
+    body.editing .topbar{right:calc(420px + clamp(40px,4.2vw,66px))}
+    body.editing [data-edit-key]{outline:2px dashed transparent;outline-offset:8px;cursor:move}
+    body.editing [data-edit-key]:hover{outline-color:rgba(79,125,243,.38)}
+    body.editing [data-edit-key].selected{outline-color:var(--accent);background-image:linear-gradient(rgba(79,125,243,.035),rgba(79,125,243,.035))}
+    body.editing .quick-btn{touch-action:none}
+    body.editing .quick-btn.dragging{opacity:.5;transform:scale(1.04);box-shadow:0 10px 24px rgba(49,95,207,.24)}
+    body.editing .settings-only{display:flex!important}
+    .settings-drawer{position:relative;z-index:60;grid-column:2;grid-row:1;width:420px;height:calc(100dvh - clamp(36px,6vw,88px));max-height:1000px;background:#fff;border:1px solid #dce5f4;border-radius:24px;box-shadow:0 18px 50px rgba(43,68,115,.12);display:none;flex-direction:column;overflow:hidden}
+    body.editing .settings-drawer{display:flex}
+    .drawer-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 22px;border-bottom:1px solid #e8edf5}
+    .drawer-head h2{font-size:1.25rem;margin:0}
+    .drawer-head-actions{display:flex;gap:8px}
+    .small-btn{border:0;border-radius:12px;background:#edf3ff;color:#315fcf;font-weight:800;padding:10px 13px;cursor:pointer}
+    .small-btn.danger{background:#fff0f1;color:#c6464e}
+    .tabs{display:grid;grid-template-columns:repeat(6,1fr);padding:10px 12px 0;gap:4px;border-bottom:1px solid #e8edf5}
+    .tab-btn{border:0;background:transparent;color:var(--muted);font-size:.82rem;font-weight:800;padding:12px 4px;border-radius:12px 12px 0 0;cursor:pointer}
+    .tab-btn.active{background:#edf3ff;color:var(--accent-strong)}
+    .drawer-body{overflow:auto;overscroll-behavior:contain;padding:18px 20px 36px;flex:1}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+    .section{padding:17px;border:1px solid #e2e9f4;border-radius:18px;margin-bottom:15px;background:#fbfdff}
+    .section h3{margin:0 0 14px;font-size:1rem}
+    .section-note{margin:-6px 0 14px;color:var(--muted);font-size:.84rem;line-height:1.55}
+    .field{display:grid;gap:7px;margin:12px 0}
+    .field label,.field-label{font-weight:750;color:#46536a;font-size:.88rem}
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .field input[type="text"],.field input[type="number"],.field select,.reminder-card input,.reminder-card select,.quick-editor input,.quick-editor select{width:100%;min-height:42px;border:1px solid #d8e1ef;border-radius:11px;padding:8px 10px;background:#fff;color:var(--ink)}
+    .field input[type="range"]{width:100%;accent-color:var(--accent)}
+    .field input[type="color"]{width:100%;height:42px;border:1px solid #d8e1ef;border-radius:11px;padding:4px;background:#fff}
+    .check-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:9px 0;font-size:.9rem;font-weight:700;color:#46536a}
+    .check-row input{width:21px;height:21px;accent-color:var(--accent)}
+    .value-pair{display:flex;align-items:center;gap:10px}
+    .value-pair output{min-width:54px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;font-size:.84rem}
+    .color-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .color-field{display:grid;grid-template-columns:42px 1fr;align-items:center;gap:9px;padding:8px;border:1px solid #e0e7f2;border-radius:12px;background:#fff}
+    .color-field input{width:42px;height:34px;border:0;background:none;padding:0}
+    .color-field span{font-size:.84rem;font-weight:750;color:#536078}
+    .selected-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:#edf3ff;color:#315fcf;font-weight:800;margin-bottom:14px}
+    .quick-editor,.reminder-card,.sound-card{border:1px solid #dfe7f2;border-radius:14px;padding:12px;margin:10px 0;background:#fff}
+    .quick-editor label.check-row{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%}
+    .quick-editor label.check-row span{min-width:0;flex:1}
+    .quick-editor label.check-row input{flex:0 0 auto;margin-left:auto}
+    .quick-editor-grid{display:grid;grid-template-columns:1.1fr .72fr .72fr .9fr;gap:8px;align-items:end}
+    .item-actions{display:flex;gap:7px;margin-top:10px;justify-content:flex-end}
+    .tiny-btn{border:0;border-radius:9px;background:#eef3fb;color:#536078;font-weight:800;padding:7px 10px;cursor:pointer}
+    .tiny-btn.remove{background:#fff0f1;color:#c6464e}
+    .reminder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .reminder-grid label,.quick-editor label{display:grid;gap:5px;font-size:.76rem;color:#6e7b92;font-weight:750}
+    .sound-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .sound-name{min-width:0;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .sound-meta{font-size:.77rem;color:var(--muted);margin-top:4px}
+    .feature-card{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;padding:13px 14px;border:1px solid #dfe7f2;border-radius:14px;background:#fff;margin:10px 0}
+    .feature-card label{display:flex;align-items:center;gap:10px;font-weight:800;color:#46536a}
+    .feature-card input[type="checkbox"]{width:21px;height:21px;accent-color:var(--accent)}
+    .feature-detail{grid-column:1/-1;border-top:1px solid #e8edf5;padding-top:10px}
+    .feature-detail summary{cursor:pointer;color:var(--accent-strong);font-weight:800}
+    .continuous-editor{border:1px solid #dfe7f2;border-radius:16px;padding:14px;margin:12px 0;background:#fff}
+    .continuous-editor.current{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,125,243,.08)}
+    .continuous-name-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+    .continuous-time-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:12px 0}
+    .continuous-time-grid label{display:grid;gap:5px;font-size:.74rem;color:#6e7b92;font-weight:750}
+    .continuous-time-grid input{width:100%;min-width:0;min-height:42px;border:1px solid #d8e1ef;border-radius:11px;padding:8px;background:#fff}
+    .continuous-schedule{position:absolute;left:clamp(20px,4vw,60px);right:clamp(20px,4vw,60px);bottom:22px;display:flex;align-items:center;gap:9px;overflow-x:auto;padding:7px 4px;scrollbar-width:thin;transform:translate(var(--move-x,0px),var(--move-y,0px))}
+    .timer-card.has-schedule{padding-bottom:max(120px,9vh)}
+    .schedule-chip{flex:0 0 auto;border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);border-radius:14px;background:var(--accent-soft);color:var(--quick-text);padding:10px 15px;font-weight:800;opacity:.48;cursor:pointer;transition:.2s ease}
+    .schedule-chip.active{opacity:1;background:var(--accent);color:var(--primary-text);box-shadow:0 7px 18px rgba(79,125,243,.22)}
+    .schedule-chip.done{opacity:.28;text-decoration:line-through}
+    .schedule-index{font-size:.74em;opacity:.72;margin-right:5px}
+    body.focus-mode .continuous-schedule{display:none!important}
+    .upload-box{display:grid;place-items:center;text-align:center;border:2px dashed #cdd9ea;border-radius:16px;padding:22px 16px;background:#f7faff;cursor:pointer;color:#536078;font-weight:800}
+    .upload-box input{display:none}
+    .db-card{display:grid;gap:10px}
+    .db-state{padding:12px;border-radius:12px;background:#f1f5fb;color:#536078;font-size:.88rem;line-height:1.5}
+    .full-btn{width:100%;border:0;border-radius:12px;padding:13px 15px;background:var(--accent);color:#fff;font-weight:800;cursor:pointer}
+    .full-btn.secondary{background:#edf3ff;color:#315fcf}
+    .toast{position:fixed;z-index:100;left:50%;bottom:28px;transform:translate(-50%,20px);padding:13px 18px;border-radius:14px;background:#17233c;color:#fff;font-weight:700;box-shadow:0 16px 40px rgba(20,32,58,.28);opacity:0;pointer-events:none;transition:.22s ease;max-width:min(520px,90vw);text-align:center}
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+    .timeup-overlay{position:fixed;z-index:90;inset:0;display:none;place-items:center;text-align:center;padding:28px;background:rgba(244,248,255,.96);color:var(--ink)}
+    .timeup-overlay.show{display:grid}
+    .timeup-content h2{font-size:min(var(--timeup-title-size,160px),18vw);line-height:1;margin:0 0 30px;color:var(--danger);letter-spacing:.08em;overflow-wrap:anywhere}
+    .timeup-content p{font-size:min(var(--timeup-message-size,28px),9vw);font-weight:750;margin:0 0 34px;overflow-wrap:anywhere}
+    .timeup-content button{border:0;border-radius:18px;padding:.9em 2.2em;background:var(--danger);color:#fff;font-size:min(var(--timeup-button-size,19px),8vw);font-weight:850;cursor:pointer}
+    body.editing .timeup-overlay.preview{right:calc(420px + clamp(18px,3vw,44px))}
+    @media(max-width:1100px){body.editing .timeup-overlay.preview{right:390px}}
+    @media(max-width:760px){body.editing .timeup-overlay.preview{right:0;bottom:50vh}}
+    .time-editor-overlay{position:fixed;z-index:95;inset:0;display:none;place-items:center;padding:24px;background:rgba(23,35,60,.28);backdrop-filter:blur(8px)}
+    .time-editor-overlay.show{display:grid}
+    .time-editor-card{width:min(650px,94vw);padding:26px;border-radius:24px;background:#fff;box-shadow:0 24px 70px rgba(20,32,58,.26)}
+    .time-editor-card h2{margin:0 0 8px;font-size:1.5rem}
+    .time-editor-card p{margin:0 0 20px;color:var(--muted);font-size:.92rem}
+    .time-editor-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .time-editor-grid label{display:grid;gap:7px;color:#536078;font-weight:800;font-size:.84rem}
+    .time-editor-grid input{width:100%;min-width:0;border:2px solid #d8e1ef;border-radius:13px;padding:13px 10px;color:var(--ink);font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;text-align:center}
+    .time-editor-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin-top:20px}
+    .time-editor-actions button{border:0;border-radius:13px;padding:14px;font-weight:850;cursor:pointer}
+    .time-editor-actions .cancel{background:#edf1f7;color:#536078}
+    .time-editor-actions .confirm{background:var(--accent);color:var(--primary-text)}
+    .context-toolbar{position:fixed;z-index:120;width:min(330px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;padding:14px;border:1px solid #d8e2f1;border-radius:17px;background:rgba(255,255,255,.97);box-shadow:0 18px 48px rgba(30,49,84,.24);backdrop-filter:blur(18px);display:none;color:#33405a}
+    .context-toolbar.show{display:block}
+    .context-toolbar-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+    .context-toolbar-head strong{font-size:.92rem}
+    .context-close{width:30px;height:30px;border:0;border-radius:9px;background:#eef3fb;color:#536078;font-weight:900;cursor:pointer}
+    .context-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .context-field{display:grid;gap:5px;font-size:.75rem;font-weight:800;color:#66738a}
+    .context-field select,.context-field input[type="number"]{width:100%;min-height:38px;border:1px solid #d8e1ef;border-radius:10px;padding:7px 8px;background:#fff;color:#26334d}
+    .context-color{display:flex;align-items:center;gap:7px;min-height:38px;padding:4px 8px;border:1px solid #d8e1ef;border-radius:10px;background:#fff}
+    .context-color input[type="color"]{width:34px;height:28px;border:0;padding:0;background:transparent}
+    .context-color span{font-size:.74rem;white-space:nowrap}
+    .context-transparent{display:flex;align-items:center;justify-content:space-between;gap:10px;grid-column:1/-1;padding:7px 1px;font-size:.78rem;font-weight:800;color:#536078}
+    .context-transparent input{width:19px;height:19px;accent-color:var(--accent)}
+    .context-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    .context-actions button{border:0;border-radius:10px;padding:10px 8px;font-weight:850;cursor:pointer;background:#edf3ff;color:#315fcf}
+    .context-actions button:last-child{background:#f2f4f8;color:#657188}
+    .context-related{margin-top:12px;padding-top:11px;border-top:1px solid #e5ebf4}
+    .context-related-title{font-size:.78rem;font-weight:900;color:#536078;margin-bottom:8px}
+    .context-related-links{display:flex;flex-wrap:wrap;gap:7px}
+    .context-link{border:1px solid #d9e4f4;border-radius:9px;padding:8px 9px;background:#f7faff;color:#315fcf;font-size:.76rem;font-weight:850;cursor:pointer}
+    .settings-highlight{background:#fff1d7!important;box-shadow:0 0 0 3px rgba(238,159,55,.3)!important;transition:background .25s ease,box-shadow .25s ease}
+    body.flash-alert .timeup-overlay{animation:alertFlash .75s steps(2,end) infinite}
+    @keyframes alertFlash{0%,100%{background:rgba(255,255,255,.98)}50%{background:color-mix(in srgb,var(--danger) 22%,white)}}
+    body.focus-mode{cursor:pointer}
+    body.focus-mode .topbar,body.focus-mode .timer-title,body.focus-mode .quick-row,body.focus-mode .action-stack{display:none!important}
+    body.focus-mode .timer-card{width:100vw;min-height:100dvh;border:0;border-radius:0;box-shadow:none;background:transparent;padding:6vw;gap:6vh}
+    body.focus-mode .timer-card::before{display:none}
+    body.focus-mode .time-display{font-size:clamp(7rem,17vw,19rem)}
+    body.focus-mode .progress-wrap{width:min(1450px,88vw)}
+    body.focus-mode .app{padding:0}
+    .no-transition *{transition:none!important}
+    @media(max-width:760px){
+      .app{padding:80px 14px 20px}
+      .timer-card{width:100%;min-height:calc(100dvh - 100px);padding:34px 18px;gap:24px}
+      .time-display{font-size:clamp(3.3rem,15vw,7rem)}
+      .quick-btn{min-width:calc(50% - 8px);padding:15px 12px}
+      .status-pill{font-size:.78rem;padding:9px 11px}
+      .time-editor-grid{grid-template-columns:1fr 1fr}
+    }
+    @media(max-width:1100px){
+      body.editing .app{grid-template-columns:minmax(0,1fr) 360px;gap:12px;padding:18px}
+      body.editing .topbar{right:390px}
+      .settings-drawer{width:360px;height:calc(100dvh - 36px);border-radius:18px}
+      .drawer-head{padding:13px 16px}
+      .tabs{padding-top:4px;overflow-x:auto;grid-template-columns:repeat(6,minmax(52px,1fr))}
+      .timer-card{padding-left:24px;padding-right:24px}
+      .time-display{font-size:clamp(3.6rem,10vw,8rem)!important}
+      .quick-btn{min-width:92px}
+    }
+    @media(max-width:760px){
+      body.editing .app{grid-template-columns:1fr;grid-template-rows:auto auto;padding:12px;overflow:auto;place-items:stretch}
+      body.editing .timer-card{grid-column:1;grid-row:1;min-height:72vh!important}
+      body.editing .topbar{right:18px}
+      .settings-drawer{grid-column:1;grid-row:2;width:100%;height:78vh}
+    }
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <header class="topbar">
+      <div class="status-pill" id="dbStatus"><span class="status-dot"></span><span>CSV尚未連結</span></div>
+      <div class="top-actions">
+        <button class="icon-btn" id="dbButton" type="button" aria-label="連結CSV資料庫">↗</button>
+        <button class="icon-btn" id="settingsButton" type="button" aria-label="開啟設定">⚙</button>
+      </div>
+    </header>
+
+    <section class="timer-card" id="timerCard" data-edit-key="panel" aria-label="倒數計時器">
+      <h1 class="timer-title" id="timerTitle" data-edit-key="title">剩餘時間</h1>
+      <div class="time-display" id="timeDisplay" data-edit-key="time" role="timer" aria-live="off" tabindex="0" title="點擊編輯倒數時間">
+        <span id="timeMain">00:15:00</span><span class="milliseconds">.000</span>
+      </div>
+      <div class="progress-wrap" id="progressWrap" data-edit-key="progress" aria-label="倒數進度">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div><div class="progress-marker" id="progressMarker"></div></div>
+        <div class="progress-meta" id="progressMeta"><span>倒數進度</span><span id="progressPercent">剩餘100.0%</span></div>
+      </div>
+      <div class="quick-row" id="quickRow" data-edit-key="quick">
+        <button class="quick-btn" type="button">+1min</button>
+        <button class="quick-btn" type="button">+5min</button>
+        <button class="quick-btn" type="button">+15min</button>
+        <button class="quick-btn" type="button">+50min</button>
+      </div>
+      <div class="action-stack" id="actionStack" data-edit-key="actions">
+        <button class="focus-btn hidden" id="focusButton" type="button">專注倒數</button>
+        <button class="primary-btn" id="startButton" type="button">開始倒數</button>
+      </div>
+      <div class="continuous-schedule hidden" id="continuousSchedule" data-edit-key="schedule" aria-label="連續倒數排程"></div>
+    </section>
+
+    <aside class="settings-drawer" id="settingsDrawer" aria-label="倒數計時器設定">
+      <div class="drawer-head">
+        <h2>編輯倒數畫面</h2>
+        <div class="drawer-head-actions">
+          <button class="small-btn" id="resetButton" type="button">恢復預設</button>
+          <button class="small-btn" id="closeSettingsButton" type="button">完成</button>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="設定分類">
+        <button class="tab-btn active" type="button" data-tab="appearance">畫面</button>
+        <button class="tab-btn" type="button" data-tab="quick">快捷</button>
+        <button class="tab-btn" type="button" data-tab="sound">響鈴</button>
+        <button class="tab-btn" type="button" data-tab="features">功能</button>
+        <button class="tab-btn" type="button" data-tab="continuous">連續</button>
+        <button class="tab-btn" type="button" data-tab="database">資料</button>
+      </nav>
+      <div class="drawer-body">
+        <section class="tab-panel active" data-panel="appearance">
+          <div class="selected-banner"><span>目前選取：<span id="selectedName">整體區塊</span></span><button class="tiny-btn" id="resetPositionButton" type="button">位置歸零</button></div>
+          <div class="section">
+            <h3>文字與位置</h3>
+            <p class="section-note">點擊左側任一文字或區塊，會在點擊處開啟快捷設定；拖動區塊即可調整位置。</p>
+            <div class="field" id="selectedTextField">
+              <label for="selectedText">顯示文字</label>
+              <input id="selectedText" type="text" autocomplete="off">
+            </div>
+            <div class="field-row">
+              <div class="field"><label for="moveX">水平位置</label><div class="value-pair"><input id="moveX" type="range" min="-400" max="400" step="1"><output id="moveXValue">0px</output></div></div>
+              <div class="field"><label for="moveY">垂直位置</label><div class="value-pair"><input id="moveY" type="range" min="-300" max="300" step="1"><output id="moveYValue">0px</output></div></div>
+            </div>
+            <div class="field"><label for="fontFamily">字型版型</label><select id="fontFamily"><option value="sans">清晰黑體</option><option value="rounded">柔和圓體</option><option value="serif">典雅明體</option><option value="mono">等寬數字</option></select></div>
+            <div class="field"><label for="fontWeight">文字粗細</label><div class="value-pair"><input id="fontWeight" type="range" min="400" max="900" step="50"><output id="fontWeightValue">750</output></div></div>
+            <div class="field"><label for="titleSize">標題大小</label><div class="value-pair"><input id="titleSize" type="range" min="24" max="120" step="1"><output id="titleSizeValue">64px</output></div></div>
+            <div class="field"><label for="timeSize">倒數數字大小</label><div class="value-pair"><input id="timeSize" type="range" min="64" max="300" step="1"><output id="timeSizeValue">180px</output></div></div>
+            <div class="field"><label for="millisecondScale">毫秒比例</label><div class="value-pair"><input id="millisecondScale" type="range" min="25" max="80" step="1"><output id="millisecondScaleValue">50%</output></div></div>
+            <label class="check-row"><span>顯示毫秒</span><input id="showMilliseconds" type="checkbox"></label>
+            <div class="field"><label for="millisecondDigits">毫秒位數</label><select id="millisecondDigits"><option value="1">1位</option><option value="2">2位</option><option value="3">3位</option></select></div>
+          </div>
+          <div class="section">
+            <h3>顏色</h3>
+            <div class="color-grid">
+              <label class="color-field"><input id="backgroundColor" type="color"><span>背景顏色</span></label>
+              <label class="color-field"><input id="panelColor" type="color"><span>區塊顏色</span></label>
+              <label class="color-field"><input id="titleColor" type="color"><span>標題顏色</span></label>
+              <label class="color-field"><input id="timeColor" type="color"><span>數字顏色</span></label>
+              <label class="color-field"><input id="millisecondColor" type="color"><span>毫秒顏色</span></label>
+              <label class="color-field"><input id="accentColor" type="color"><span>主要按鈕</span></label>
+              <label class="color-field"><input id="primaryTextColor" type="color"><span>主要按鈕文字</span></label>
+              <label class="color-field"><input id="quickColor" type="color"><span>快捷按鈕</span></label>
+              <label class="color-field"><input id="quickTextColor" type="color"><span>快捷按鈕文字</span></label>
+              <label class="color-field"><input id="focusColor" type="color"><span>專注按鈕</span></label>
+              <label class="color-field"><input id="focusTextColor" type="color"><span>專注按鈕文字</span></label>
+              <label class="color-field"><input id="progressTrackColor" type="color"><span>進度底色</span></label>
+              <label class="color-field"><input id="dangerColor" type="color"><span>提醒顏色</span></label>
+            </div>
+          </div>
+          <div class="section">
+            <h3>區塊與操作</h3>
+            <div class="field"><label for="panelStyle">區塊樣式</label><select id="panelStyle"><option value="soft">柔和浮起</option><option value="border">清晰框線</option><option value="flat">純色平面</option><option value="glass">透亮玻璃</option></select></div>
+            <div class="field"><label for="panelRadius">圓角大小</label><div class="value-pair"><input id="panelRadius" type="range" min="0" max="60" step="1"><output id="panelRadiusValue">34px</output></div></div>
+            <div class="field"><label for="panelWidth">區塊寬度</label><div class="value-pair"><input id="panelWidth" type="range" min="55" max="98" step="1"><output id="panelWidthValue">94%</output></div></div>
+            <div class="field"><label for="panelHeight">區塊高度</label><div class="value-pair"><input id="panelHeight" type="range" min="45" max="96" step="1"><output id="panelHeightValue">86%</output></div></div>
+            <div class="field"><label for="progressHeight">進度條粗細</label><div class="value-pair"><input id="progressHeight" type="range" min="8" max="48" step="1"><output id="progressHeightValue">24px</output></div></div>
+            <label class="check-row"><span>顯示進度條下方文字</span><input id="showProgressText" type="checkbox"></label>
+            <label class="check-row"><span>顯示進度條尾端圓形圖示</span><input id="showProgressMarker" type="checkbox"></label>
+            <div class="field"><label for="quickButtonSize">快捷按鈕文字大小</label><div class="value-pair"><input id="quickButtonSize" type="range" min="14" max="36" step="1"><output id="quickButtonSizeValue">20px</output></div></div>
+            <div class="field"><label for="actionButtonSize">操作按鈕文字大小</label><div class="value-pair"><input id="actionButtonSize" type="range" min="16" max="42" step="1"><output id="actionButtonSizeValue">24px</output></div></div>
+            <div class="field"><label for="buttonRadius">按鈕圓角大小</label><div class="value-pair"><input id="buttonRadius" type="range" min="0" max="40" step="1"><output id="buttonRadiusValue">18px</output></div></div>
+            <div class="field"><label for="startLabel">開始按鈕文字</label><input id="startLabel" type="text"></div>
+            <div class="field"><label for="endLabel">結束按鈕文字</label><input id="endLabel" type="text"></div>
+            <div class="field"><label for="focusLabel">專注按鈕文字</label><input id="focusLabel" type="text"></div>
+            <label class="check-row"><span>開始時進入全螢幕</span><input id="autoFullscreen" type="checkbox"></label>
+            <label class="check-row"><span>開始時進入專注模式</span><input id="autoFocus" type="checkbox"></label>
+            <label class="check-row"><span>歸零時畫面閃爍</span><input id="flashEnabled" type="checkbox"></label>
+          </div>
+          <div class="section" id="timeupTextSection">
+            <h3>歸零畫面文字</h3>
+            <p class="section-note">調整「時間到」畫面的文字大小。按下預覽可一邊看一邊調整；小螢幕會自動縮小以免超出畫面。</p>
+            <div class="field"><label for="timeupTitleSize">標題大小（時間到）</label><div class="value-pair"><input id="timeupTitleSize" type="range" min="32" max="360" step="2"><output id="timeupTitleSizeValue">160px</output></div></div>
+            <div class="field"><label for="timeupMessageSize">說明文字大小</label><div class="value-pair"><input id="timeupMessageSize" type="range" min="14" max="120" step="1"><output id="timeupMessageSizeValue">28px</output></div></div>
+            <div class="field"><label for="timeupButtonSize">關閉按鈕文字大小</label><div class="value-pair"><input id="timeupButtonSize" type="range" min="14" max="72" step="1"><output id="timeupButtonSizeValue">19px</output></div></div>
+            <button class="full-btn secondary" id="previewTimeupButton" type="button">預覽歸零畫面</button>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="quick">
+          <div class="section">
+            <h3>快捷倒數按鈕</h3>
+            <p class="section-note">可自訂增加或減少時間、按鈕文字與排列順序，也可在左側主畫面直接拖曳快捷按鈕重新排序。</p>
+            <div id="quickEditorList"></div>
+            <button class="full-btn secondary" id="addQuickButton" type="button">新增快捷按鈕</button>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="sound">
+          <div class="section">
+            <h3>內建鈴聲</h3>
+            <div class="field"><label for="builtinTone">預設鈴聲</label><select id="builtinTone"><option value="gentle">柔和提示音</option><option value="clear">清脆鈴聲</option><option value="double">雙音鈴</option><option value="alert">明顯警示音</option><option value="quizbell">搶答鈴聲</option><option value="servicebell">服務鈴</option></select></div>
+            <p class="section-note">「服務鈴」依你提供的音檔頻譜重建，使用乾淨的金屬純音合成，不含錄音背景雜音，並可調整音高與單聲長度。</p>
+            <div class="field"><label for="toneVolume">音量</label><div class="value-pair"><input id="toneVolume" type="range" min="0" max="100" step="1"><output id="toneVolumeValue">55%</output></div></div>
+            <div class="field"><label for="tonePitch">音高</label><div class="value-pair"><input id="tonePitch" type="range" min="220" max="1320" step="10"><output id="tonePitchValue">660Hz</output></div></div>
+            <div class="field"><label for="toneDuration">單聲長度</label><div class="value-pair"><input id="toneDuration" type="range" min="80" max="1200" step="20"><output id="toneDurationValue">260ms</output></div></div>
+            <button class="full-btn secondary" id="previewBuiltinButton" type="button">試聽內建鈴聲</button>
+          </div>
+          <div class="section">
+            <h3>自訂音訊庫</h3>
+            <p class="section-note">支援常見音訊格式，單檔建議不超過15MB。音訊會編碼後存入CSV。</p>
+            <label class="upload-box">＋上傳自訂音訊<input id="soundUpload" type="file" accept="audio/*" multiple></label>
+            <div id="customSoundList"></div>
+          </div>
+          <div class="section">
+            <h3>歸零提醒</h3>
+            <div class="field"><label for="endSoundSelect">歸零鈴聲</label><select id="endSoundSelect"></select></div>
+            <div class="field-row">
+              <div class="field"><label for="endRepeat">響鈴次數</label><input id="endRepeat" type="number" min="1" max="20"></div>
+              <div class="field"><label for="endInterval">響鈴間隔（秒）</label><input id="endInterval" type="number" min="0.1" max="10" step="0.1"></div>
+            </div>
+            <div class="field"><label for="endPlaybackRate">播放倍速</label><input id="endPlaybackRate" type="number" min="0.25" max="4" step="0.05"></div>
+            <p class="section-note" style="margin:4px 0 14px">「間隔」是每一聲開始之間的秒數：第一聲響起後，過X秒就立刻響下一聲，不必等前一聲播完，聲音可重疊（如同快速連點試聽）。</p>
+            <button class="full-btn secondary" id="previewEndSoundButton" type="button">試聽歸零提醒</button>
+          </div>
+          <div class="section">
+            <h3>自訂時間提醒</h3>
+            <p class="section-note">例如設定剩餘2分鐘時響2次。每項規則只會在單次倒數中觸發一次。</p>
+            <div id="reminderList"></div>
+            <button class="full-btn secondary" id="addReminderButton" type="button">新增提醒規則</button>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="features">
+          <div class="section">
+            <h3>功能總覽</h3>
+            <p class="section-note">所有可啟用或停用的功能集中在這裡，也可直接前往原始設定位置。</p>
+            <div id="featureList"></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="continuous">
+          <div class="section">
+            <h3>連續倒數</h3>
+            <label class="check-row"><span>啟用連續倒數功能</span><input id="continuousEnabled" type="checkbox"></label>
+            <p class="section-note">啟用後，主畫面底部會顯示所有排程。點擊排程即可選擇從該項開始。</p>
+            <div id="continuousEditorList"></div>
+            <button class="full-btn secondary" id="addContinuousButton" type="button">新增連續倒數</button>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="database">
+          <div class="section db-card">
+            <h3>CSV資料庫</h3>
+            <div class="db-state" id="drawerDbStatus">尚未連結資料夾。目前設定會先保存在此裝置。</div>
+            <button class="full-btn" id="connectDbButton" type="button">連結資料庫資料夾</button>
+            <button class="full-btn secondary" id="saveDbButton" type="button">立即儲存CSV</button>
+            <button class="full-btn secondary" id="downloadDbButton" type="button">下載CSV備份</button>
+            <label class="upload-box">匯入CSV備份<input id="importCsvInput" type="file" accept=".csv,text/csv"></label>
+          </div>
+          <div class="section">
+            <h3>資料說明</h3>
+            <p class="section-note">首次連結時請選擇「倒數計時器.html」所在資料夾。若找不到「倒數計時器-資料庫.csv」，系統會自動建立。Android瀏覽器若清除網站權限，需再次點擊連結。</p>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <div class="context-toolbar" id="contextToolbar" role="dialog" aria-label="區塊快捷設定">
+      <div class="context-toolbar-head"><strong id="contextTitle">區塊快捷設定</strong><button class="context-close" id="contextCloseButton" type="button" aria-label="關閉快捷設定">×</button></div>
+      <div class="context-grid">
+        <label class="context-field">字體顏色<span class="context-color"><input id="contextFontColor" type="color"><span>選擇顏色</span></span></label>
+        <label class="context-field">文字大小<input id="contextFontSize" type="number" min="12" max="320" step="1"></label>
+        <label class="context-field">文字字型<select id="contextFontFamily"><option value="sans">清晰黑體</option><option value="rounded">柔和圓體</option><option value="serif">典雅明體</option><option value="mono">等寬數字</option></select></label>
+        <label class="context-field">字體粗細<input id="contextFontWeight" type="number" min="400" max="900" step="50"></label>
+        <label class="context-field">背景顏色<span class="context-color"><input id="contextBackgroundColor" type="color"><span>選擇顏色</span></span></label>
+        <label class="context-field">水平位置<input id="contextMoveX" type="number" min="-400" max="400" step="1"></label>
+        <label class="context-field">垂直位置<input id="contextMoveY" type="number" min="-300" max="300" step="1"></label>
+        <label class="context-transparent"><span>背景使用透明色</span><input id="contextBackgroundTransparent" type="checkbox"></label>
+      </div>
+      <div class="context-actions"><button id="contextJumpButton" type="button">前往完整設定</button><button id="contextResetStyleButton" type="button">清除個別樣式</button></div>
+      <div class="context-related"><div class="context-related-title">相關詳細設定</div><div class="context-related-links" id="contextRelatedLinks"></div></div>
+    </div>
+
+    <div class="time-editor-overlay" id="timeEditorOverlay" role="dialog" aria-modal="true" aria-labelledby="timeEditorTitle">
+      <div class="time-editor-card">
+        <h2 id="timeEditorTitle">編輯倒數時間</h2>
+        <p>輸入完成後，倒數數字與進度會立即更新。</p>
+        <div class="time-editor-grid">
+          <label>小時<input id="directHours" type="number" inputmode="numeric" min="0" max="999"></label>
+          <label>分鐘<input id="directMinutes" type="number" inputmode="numeric" min="0" max="59"></label>
+          <label>秒<input id="directSeconds" type="number" inputmode="numeric" min="0" max="59"></label>
+          <label>毫秒<input id="directMilliseconds" type="number" inputmode="numeric" min="0" max="999"></label>
+        </div>
+        <div class="time-editor-actions">
+          <button class="cancel" id="cancelTimeEditButton" type="button">取消</button>
+          <button class="confirm" id="confirmTimeEditButton" type="button">套用時間</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="timeup-overlay" id="timeupOverlay" role="alertdialog" aria-modal="true" aria-labelledby="timeupTitle">
+      <div class="timeup-content">
+        <h2 id="timeupTitle">時間到</h2>
+        <p id="timeupMessage">本次倒數已結束</p>
+        <button id="dismissAlertButton" type="button">關閉提醒</button>
+      </div>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+  <script>
+  (() => {
+    "use strict";
+
+    const DB_NAME = "倒數計時器-資料庫.csv";
+    const LOCAL_KEY = "countdownTimerConfigV1";
+    const HANDLE_DB = "countdownTimerHandleDb";
+    const HANDLE_STORE = "handles";
+    const HANDLE_KEY = "databaseDirectory";
+
+    const DEFAULT_CONFIG = {
+      version: 5,
+      title: "剩餘時間",
+      durationMs: 900000,
+      labels: { start: "開始倒數", end: "結束倒數", focus: "專注倒數" },
+      typography: { family: "sans", weight: 750, titleSize: 64, timeSize: 180, millisecondScale: 50, showMilliseconds: true, millisecondDigits: 3 },
+      colors: {
+        background: "#f4f8ff", panel: "#ffffff", title: "#17233c", time: "#17233c", milliseconds: "#4f7df3",
+        accent: "#4f7df3", primaryText: "#ffffff", quick: "#e8efff", quickText: "#315fcf",
+        focus: "#f1f5fb", focusText: "#17233c", progressTrack: "#e8edf5", danger: "#ec6269"
+      },
+      panel: { style: "soft", radius: 34, width: 94, height: 86, progressHeight: 24, quickButtonSize: 20, actionButtonSize: 24, buttonRadius: 18 },
+      progress: { showText: true, showMarker: true },
+      timeup: { titleSize: 160, messageSize: 28, buttonSize: 19 },
+      behavior: { autoFullscreen: true, autoFocus: true, flashEnabled: true },
+      positions: {
+        panel: { x: 0, y: 0 }, title: { x: 0, y: 0 }, time: { x: 0, y: 0 },
+        progress: { x: 0, y: 0 }, quick: { x: 0, y: 0 }, actions: { x: 0, y: 0 }, schedule: { x: 0, y: 0 }
+      },
+      blockStyles: { panel: {}, title: {}, time: {}, progress: {}, quick: {}, actions: {}, schedule: {} },
+      quickButtons: [
+        { id: "quick-1", label: "+1min", direction: "plus", amount: 1, unit: "minutes", deltaMs: 60000, enabled: true },
+        { id: "quick-5", label: "+5min", direction: "plus", amount: 5, unit: "minutes", deltaMs: 300000, enabled: true },
+        { id: "quick-15", label: "+15min", direction: "plus", amount: 15, unit: "minutes", deltaMs: 900000, enabled: true },
+        { id: "quick-50", label: "+50min", direction: "plus", amount: 50, unit: "minutes", deltaMs: 3000000, enabled: true }
+      ],
+      sound: {
+        builtinTone: "gentle", volume: 55, pitch: 660, duration: 260,
+        endSound: "builtin:gentle", endRepeat: 3, endIntervalMs: 900, endPlaybackRate: 1
+      },
+      reminders: [],
+      customSounds: [],
+      continuous: {
+        enabled: true, uninterrupted: true, autoDismiss: false, autoDismissSeconds: 5, items: []
+      }
+    };
+
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+    const clone = value => typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+    const isPlainObject = value => value && typeof value === "object" && !Array.isArray(value);
+    const mergeConfig = (base, incoming) => {
+      const output = clone(base);
+      const merge = (target, source) => {
+        if (!isPlainObject(source)) return target;
+        Object.keys(source).forEach(key => {
+          if (Array.isArray(source[key])) target[key] = clone(source[key]);
+          else if (isPlainObject(source[key]) && isPlainObject(target[key])) merge(target[key], source[key]);
+          else if (source[key] !== undefined) target[key] = source[key];
+        });
+        return target;
+      };
+      return normalizeConfig(merge(output, incoming));
+    };
+    const unitFactor = unit => unit === "milliseconds" ? 1 : unit === "seconds" ? 1000 : 60000;
+    function normalizeConfig(config) {
+      const sourceVersion = Number(config.version) || 0;
+      config.version = DEFAULT_CONFIG.version;
+      const normalizeReminder = item => ({
+        ...item, id: item.id || uniqueId("reminder"), timeMs: Math.max(0, Number(item.timeMs) || 0),
+        sound: item.sound || `builtin:${config.sound.builtinTone}`,
+        repeat: clamp(Number(item.repeat) || 1, 1, 20), intervalMs: clamp(Number(item.intervalMs) || 800, 100, 10000),
+        playbackRate: clamp(Number(item.playbackRate) || 1, .25, 4), enabled: item.enabled !== false
+      });
+      config.quickButtons = (config.quickButtons || []).map(item => {
+        const delta = Number(item.deltaMs) || 0;
+        let unit = item.unit;
+        let amount = Number(item.amount);
+        if (!unit || !Number.isFinite(amount)) {
+          if (Math.abs(delta) % 60000 === 0) { unit = "minutes"; amount = Math.abs(delta) / 60000; }
+          else if (Math.abs(delta) % 1000 === 0) { unit = "seconds"; amount = Math.abs(delta) / 1000; }
+          else { unit = "milliseconds"; amount = Math.abs(delta); }
+        }
+        const direction = item.direction || (delta < 0 ? "minus" : "plus");
+        return { ...item, direction, amount, unit, enabled: item.enabled !== false, deltaMs: (direction === "minus" ? -1 : 1) * amount * unitFactor(unit) };
+      });
+      config.reminders = (config.reminders || []).map(normalizeReminder);
+      config.sound.endPlaybackRate = clamp(Number(config.sound.endPlaybackRate) || 1, .25, 4);
+      config.typography.showMilliseconds = config.typography.showMilliseconds !== false;
+      config.typography.millisecondDigits = clamp(Math.round(Number(config.typography.millisecondDigits) || 3), 1, 3);
+      config.colors.milliseconds ||= config.colors.accent;
+      config.behavior.autoFocus = sourceVersion < 4 ? true : Boolean(config.behavior.autoFocus);
+      config.progress ||= clone(DEFAULT_CONFIG.progress);
+      config.timeup = isPlainObject(config.timeup) ? config.timeup : clone(DEFAULT_CONFIG.timeup);
+      config.timeup.titleSize = clamp(Number(config.timeup.titleSize) || DEFAULT_CONFIG.timeup.titleSize, 32, 360);
+      config.timeup.messageSize = clamp(Number(config.timeup.messageSize) || DEFAULT_CONFIG.timeup.messageSize, 14, 120);
+      config.timeup.buttonSize = clamp(Number(config.timeup.buttonSize) || DEFAULT_CONFIG.timeup.buttonSize, 14, 72);
+      config.progress.showText = config.progress.showText !== false;
+      config.progress.showMarker = config.progress.showMarker !== false;
+      config.positions.schedule ||= { x: 0, y: 0 };
+      config.blockStyles ||= clone(DEFAULT_CONFIG.blockStyles);
+      Object.keys(DEFAULT_CONFIG.blockStyles).forEach(key => {
+        if (!isPlainObject(config.blockStyles[key])) config.blockStyles[key] = {};
+        const style = config.blockStyles[key];
+        if (style.fontSize != null) style.fontSize = clamp(Number(style.fontSize) || 16, 12, 320);
+        if (style.fontWeight != null) style.fontWeight = clamp(Math.round((Number(style.fontWeight) || 750) / 50) * 50, 400, 900);
+        if (style.fontFamily && !["sans", "rounded", "serif", "mono"].includes(style.fontFamily)) delete style.fontFamily;
+        if (style.fontColor && !/^#[0-9a-f]{6}$/i.test(style.fontColor)) delete style.fontColor;
+        if (style.background && style.background !== "transparent" && !/^#[0-9a-f]{6}$/i.test(style.background)) delete style.background;
+      });
+      config.continuous ||= clone(DEFAULT_CONFIG.continuous);
+      config.continuous.enabled = config.continuous.enabled !== false;
+      config.continuous.uninterrupted = config.continuous.uninterrupted !== false;
+      config.continuous.autoDismiss = Boolean(config.continuous.autoDismiss);
+      config.continuous.autoDismissSeconds = clamp(Number(config.continuous.autoDismissSeconds) || 5, .5, 300);
+      config.continuous.items = (config.continuous.items || []).map((item, index) => ({
+        id: item.id || uniqueId("continuous"), name: item.name || `倒數${index + 1}`,
+        durationMs: Math.max(0, Number(item.durationMs) || 0), enabled: item.enabled !== false,
+        sound: item.sound || `builtin:${config.sound.builtinTone}`,
+        repeat: clamp(Number(item.repeat) || 1, 1, 20), intervalMs: clamp(Number(item.intervalMs) || 800, 100, 10000),
+        playbackRate: clamp(Number(item.playbackRate) || 1, .25, 4),
+        customRemindersEnabled: Boolean(item.customRemindersEnabled), expanded: Boolean(item.expanded),
+        reminders: (item.reminders || []).map(normalizeReminder)
+      }));
+      return config;
+    }
+    const escapeHtml = value => String(value).replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]);
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const uniqueId = prefix => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+    const state = {
+      config: clone(DEFAULT_CONFIG),
+      remainingMs: DEFAULT_CONFIG.durationMs,
+      totalMs: DEFAULT_CONFIG.durationMs,
+      running: false,
+      endAt: 0,
+      previousRemainingMs: DEFAULT_CONFIG.durationMs,
+      raf: 0,
+      firedReminders: new Set(),
+      selectedKey: "panel",
+      drag: null,
+      quickDrag: null,
+      directoryHandle: null,
+      fileHandle: null,
+      saveTimer: 0,
+      saving: false,
+      pendingSave: false,
+      audioContext: null,
+      activeAudios: new Set(),
+      activeNodes: new Set(),
+      audioReadyAt: 0,
+      audioKeepAlive: null,
+      focusFullscreen: false,
+      previewingTimeup: false,
+      starting: false,
+      audioUrls: new Map(),
+      alertTimers: [],
+      soundGeneration: 0,
+      wakeLock: null,
+      toastTimer: 0,
+      focusListenerTimer: 0,
+      continuousIndex: 0,
+      completedContinuousIds: new Set(),
+      pendingContinuousAdvance: false,
+      autoDismissTimer: 0
+    };
+
+    const elements = {
+      root: document.documentElement,
+      body: document.body,
+      app: $("#app"),
+      timerCard: $("#timerCard"),
+      timerTitle: $("#timerTitle"),
+      timeDisplay: $("#timeDisplay"),
+      timeMain: $("#timeMain"),
+      milliseconds: $("#timeDisplay .milliseconds"),
+      progressFill: $("#progressFill"),
+      progressMarker: $("#progressMarker"),
+      progressPercent: $("#progressPercent"),
+      progressMeta: $("#progressMeta"),
+      quickRow: $("#quickRow"),
+      startButton: $("#startButton"),
+      focusButton: $("#focusButton"),
+      settingsButton: $("#settingsButton"),
+      closeSettingsButton: $("#closeSettingsButton"),
+      settingsDrawer: $("#settingsDrawer"),
+      dbButton: $("#dbButton"),
+      dbStatus: $("#dbStatus"),
+      drawerDbStatus: $("#drawerDbStatus"),
+      timeupOverlay: $("#timeupOverlay"),
+      dismissAlertButton: $("#dismissAlertButton"),
+      toast: $("#toast"),
+      selectedName: $("#selectedName"),
+      selectedTextField: $("#selectedTextField"),
+      selectedText: $("#selectedText"),
+      moveX: $("#moveX"),
+      moveY: $("#moveY"),
+      quickEditorList: $("#quickEditorList"),
+      customSoundList: $("#customSoundList"),
+      reminderList: $("#reminderList"),
+      endSoundSelect: $("#endSoundSelect"),
+      featureList: $("#featureList"),
+      continuousEditorList: $("#continuousEditorList"),
+      continuousSchedule: $("#continuousSchedule"),
+      timeupTitle: $("#timeupTitle"),
+      timeupMessage: $("#timeupMessage")
+    };
+    elements.contextToolbar = $("#contextToolbar");
+    elements.contextTitle = $("#contextTitle");
+    elements.contextFontColor = $("#contextFontColor");
+    elements.contextFontSize = $("#contextFontSize");
+    elements.contextFontFamily = $("#contextFontFamily");
+    elements.contextFontWeight = $("#contextFontWeight");
+    elements.contextBackgroundColor = $("#contextBackgroundColor");
+    elements.contextBackgroundTransparent = $("#contextBackgroundTransparent");
+    elements.contextMoveX = $("#contextMoveX");
+    elements.contextMoveY = $("#contextMoveY");
+    elements.contextRelatedLinks = $("#contextRelatedLinks");
+    elements.timeEditorOverlay = $("#timeEditorOverlay");
+    elements.directHours = $("#directHours");
+    elements.directMinutes = $("#directMinutes");
+    elements.directSeconds = $("#directSeconds");
+    elements.directMilliseconds = $("#directMilliseconds");
+
+    function showToast(message, duration = 2600) {
+      clearTimeout(state.toastTimer);
+      elements.toast.textContent = message;
+      elements.toast.classList.add("show");
+      state.toastTimer = setTimeout(() => elements.toast.classList.remove("show"), duration);
+    }
+
+    function familyValue(key) {
+      const families = {
+        sans: '"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif',
+        rounded: '"Arial Rounded MT Bold","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif',
+        serif: '"Noto Serif TC","PMingLiU","Times New Roman",serif',
+        mono: '"Roboto Mono","SFMono-Regular",Consolas,"Microsoft JhengHei",monospace'
+      };
+      return families[key] || families.sans;
+    }
+
+    function effectiveBlockFontColor(key) {
+      const style = state.config.blockStyles[key] || {};
+      if (style.fontColor) return style.fontColor;
+      const defaults = {
+        panel: state.config.colors.time, title: state.config.colors.title, time: state.config.colors.time,
+        progress: "#5f6f89", quick: state.config.colors.quickText,
+        actions: state.config.colors.primaryText, schedule: state.config.colors.quickText
+      };
+      return defaults[key] || state.config.colors.time;
+    }
+
+    function effectiveBlockFontSize(key) {
+      const style = state.config.blockStyles[key] || {};
+      if (style.fontSize) return Number(style.fontSize);
+      const defaults = {
+        panel: 16, title: state.config.typography.titleSize, time: state.config.typography.timeSize,
+        progress: 14, quick: state.config.panel.quickButtonSize,
+        actions: state.config.panel.actionButtonSize, schedule: 16
+      };
+      return defaults[key] || 16;
+    }
+
+    function applyBlockStyles() {
+      Object.keys(DEFAULT_CONFIG.blockStyles).forEach(key => {
+        const target = document.querySelector(`[data-edit-key="${key}"]`);
+        if (!target) return;
+        const style = state.config.blockStyles[key] || {};
+        target.style.fontFamily = style.fontFamily ? familyValue(style.fontFamily) : "";
+        target.style.fontWeight = style.fontWeight || (["title", "time"].includes(key) ? state.config.typography.weight : "");
+        target.style.color = style.fontColor || (key === "title" ? state.config.colors.title : key === "time" ? state.config.colors.time : "");
+        target.style.fontSize = style.fontSize ? `${style.fontSize}px` : "";
+        target.style.backgroundColor = style.background || "";
+        const descendants = key === "quick" ? $$(".quick-btn", target)
+          : key === "actions" ? $$(".primary-btn,.focus-btn", target)
+          : key === "schedule" ? $$(".schedule-chip", target)
+          : key === "progress" ? $$(".progress-meta", target) : [];
+        descendants.forEach(item => {
+          item.style.fontFamily = style.fontFamily ? familyValue(style.fontFamily) : "";
+          item.style.fontWeight = style.fontWeight || "";
+          item.style.color = style.fontColor || "";
+          item.style.fontSize = style.fontSize ? `${key === "actions" && item.classList.contains("focus-btn") ? style.fontSize * .72 : style.fontSize}px` : "";
+        });
+      });
+    }
+
+    function applyAppearance() {
+      const { config } = state;
+      const rootStyle = elements.root.style;
+      rootStyle.setProperty("--bg", config.colors.background);
+      rootStyle.setProperty("--panel", config.colors.panel);
+      rootStyle.setProperty("--ink", config.colors.time);
+      rootStyle.setProperty("--accent", config.colors.accent);
+      rootStyle.setProperty("--accent-strong", config.colors.accent);
+      rootStyle.setProperty("--accent-soft", config.colors.quick);
+      rootStyle.setProperty("--primary-text", config.colors.primaryText);
+      rootStyle.setProperty("--quick-text", config.colors.quickText);
+      rootStyle.setProperty("--focus-bg", config.colors.focus);
+      rootStyle.setProperty("--focus-text", config.colors.focusText);
+      rootStyle.setProperty("--track", config.colors.progressTrack);
+      rootStyle.setProperty("--danger", config.colors.danger);
+      rootStyle.setProperty("--radius", `${config.panel.radius}px`);
+      rootStyle.setProperty("--button-radius", `${config.panel.buttonRadius}px`);
+      rootStyle.setProperty("--quick-size", `${config.panel.quickButtonSize}px`);
+      rootStyle.setProperty("--action-size", `${config.panel.actionButtonSize}px`);
+      rootStyle.setProperty("--title-size", `${config.typography.titleSize}px`);
+      rootStyle.setProperty("--time-size", `${config.typography.timeSize}px`);
+      rootStyle.setProperty("--ms-scale", config.typography.millisecondScale / 100);
+      rootStyle.setProperty("--timeup-title-size", `${config.timeup.titleSize}px`);
+      rootStyle.setProperty("--timeup-message-size", `${config.timeup.messageSize}px`);
+      rootStyle.setProperty("--timeup-button-size", `${config.timeup.buttonSize}px`);
+      rootStyle.setProperty("--font-family", familyValue(config.typography.family));
+      elements.timerTitle.style.color = config.colors.title;
+      elements.timerTitle.style.fontWeight = config.typography.weight;
+      elements.timeDisplay.style.fontWeight = config.typography.weight;
+      elements.milliseconds.style.color = config.colors.milliseconds;
+      elements.timerCard.style.width = `min(${config.panel.width}vw,1800px)`;
+      elements.timerCard.style.minHeight = `${config.panel.height}vh`;
+      $(".progress-track").style.height = `${config.panel.progressHeight}px`;
+      elements.progressMeta.classList.toggle("hidden", !config.progress.showText);
+      elements.progressMarker.classList.toggle("hidden", !config.progress.showMarker);
+      elements.milliseconds.classList.toggle("hidden", !config.typography.showMilliseconds);
+      elements.timerCard.classList.remove("style-soft", "style-border", "style-flat", "style-glass");
+      elements.timerCard.classList.add(`style-${config.panel.style}`);
+      const activeContinuous = getCurrentContinuousItem();
+      elements.timerTitle.textContent = activeContinuous ? activeContinuous.name : config.title;
+      elements.startButton.textContent = state.running ? config.labels.end : config.labels.start;
+      elements.focusButton.textContent = config.labels.focus;
+      Object.entries(config.positions).forEach(([key, position]) => {
+        const item = document.querySelector(`[data-edit-key="${key}"]`);
+        if (item) {
+          item.style.setProperty("--move-x", `${Number(position.x) || 0}px`);
+          item.style.setProperty("--move-y", `${Number(position.y) || 0}px`);
+        }
+      });
+      applyBlockStyles();
+    }
+
+    function formatTime(milliseconds) {
+      const safe = Math.max(0, Math.floor(milliseconds));
+      const hours = Math.floor(safe / 3600000);
+      const minutes = Math.floor((safe % 3600000) / 60000);
+      const seconds = Math.floor((safe % 60000) / 1000);
+      const ms = safe % 1000;
+      const millisecondDigits = clamp(Math.round(Number(state.config.typography.millisecondDigits) || 3), 1, 3);
+      return {
+        main: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+        ms: `.${String(ms).padStart(3, "0").slice(0, millisecondDigits)}`
+      };
+    }
+
+    function renderTime() {
+      const formatted = formatTime(state.remainingMs);
+      elements.timeMain.textContent = formatted.main;
+      elements.milliseconds.textContent = formatted.ms;
+      const ratio = state.totalMs > 0 ? clamp(state.remainingMs / state.totalMs, 0, 1) : 0;
+      $("#progressWrap").style.setProperty("--progress-ratio", ratio.toFixed(7));
+      elements.progressMarker.style.opacity = ratio <= 0 ? "0" : "1";
+      elements.progressPercent.textContent = `剩餘${(ratio * 100).toFixed(1)}%`;
+      elements.timeDisplay.setAttribute("aria-label", `剩餘${formatted.main}${state.config.typography.showMilliseconds ? formatted.ms : ""}`);
+    }
+
+    function renderQuickButtons() {
+      elements.quickRow.innerHTML = state.config.quickButtons.filter(item => item.enabled).map(item =>
+        `<button class="quick-btn${state.quickDrag?.id === item.id && state.quickDrag.moved ? " dragging" : ""}" type="button" data-quick-id="${escapeHtml(item.id)}">${escapeHtml(item.label)}</button>`
+      ).join("");
+      applyBlockStyles();
+    }
+
+    function enabledContinuousEntries() {
+      if (!state.config.continuous.enabled) return [];
+      return state.config.continuous.items.map((item, index) => ({ item, index })).filter(entry => entry.item.enabled);
+    }
+
+    function getCurrentContinuousItem() {
+      if (!state.config.continuous.enabled) return null;
+      const direct = state.config.continuous.items[state.continuousIndex];
+      if (direct?.enabled) return direct;
+      const first = enabledContinuousEntries()[0];
+      if (!first) return null;
+      state.continuousIndex = first.index;
+      return first.item;
+    }
+
+    function renderContinuousSchedule() {
+      const entries = enabledContinuousEntries();
+      elements.continuousSchedule.classList.toggle("hidden", !entries.length);
+      elements.timerCard.classList.toggle("has-schedule", Boolean(entries.length));
+      elements.continuousSchedule.innerHTML = entries.map(({ item, index }, visibleIndex) => {
+        const classes = ["schedule-chip"];
+        if (index === state.continuousIndex) classes.push("active");
+        if (state.completedContinuousIds.has(item.id)) classes.push("done");
+        return `<button class="${classes.join(" ")}" type="button" data-continuous-index="${index}"><span class="schedule-index">${visibleIndex + 1}</span>${escapeHtml(item.name)}</button>`;
+      }).join("");
+      applyBlockStyles();
+    }
+
+    function renderQuickEditor() {
+      elements.quickEditorList.innerHTML = state.config.quickButtons.map((item, index) => {
+        const direction = item.direction || (item.deltaMs < 0 ? "minus" : "plus");
+        return `<div class="quick-editor" id="quick-${escapeHtml(item.id)}" data-id="${escapeHtml(item.id)}">
+          <label class="check-row"><span>啟用此快捷按鈕</span><input type="checkbox" data-quick-field="enabled"${item.enabled ? " checked" : ""}></label>
+          <div class="quick-editor-grid">
+            <label>按鈕文字<input type="text" data-quick-field="label" value="${escapeHtml(item.label)}"></label>
+            <label>增減<select data-quick-field="direction"><option value="plus"${direction === "plus" ? " selected" : ""}>增加</option><option value="minus"${direction === "minus" ? " selected" : ""}>減少</option></select></label>
+            <label>數值<input type="number" min="0.001" step="0.001" data-quick-field="amount" value="${item.amount}"></label>
+            <label>單位<select data-quick-field="unit"><option value="minutes"${item.unit === "minutes" ? " selected" : ""}>分鐘</option><option value="seconds"${item.unit === "seconds" ? " selected" : ""}>秒</option><option value="milliseconds"${item.unit === "milliseconds" ? " selected" : ""}>毫秒</option></select></label>
+          </div>
+          <div class="item-actions">
+            <button class="tiny-btn" type="button" data-quick-action="up"${index === 0 ? " disabled" : ""}>上移</button>
+            <button class="tiny-btn" type="button" data-quick-action="down"${index === state.config.quickButtons.length - 1 ? " disabled" : ""}>下移</button>
+            <button class="tiny-btn remove" type="button" data-quick-action="remove">刪除</button>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    function soundOptions(selected) {
+      const builtin = [
+        ["builtin:gentle", "內建－柔和提示音"], ["builtin:clear", "內建－清脆鈴聲"],
+        ["builtin:double", "內建－雙音鈴"], ["builtin:alert", "內建－明顯警示音"],
+        ["builtin:quizbell", "內建－搶答鈴聲"], ["builtin:servicebell", "內建－服務鈴"]
+      ];
+      return [...builtin, ...state.config.customSounds.map(sound => [`custom:${sound.id}`, `自訂－${sound.name}`])]
+        .map(([value, label]) => `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}>${escapeHtml(label)}</option>`).join("");
+    }
+
+    function renderSoundSelectors() {
+      if (!soundChoiceExists(state.config.sound.endSound)) state.config.sound.endSound = `builtin:${state.config.sound.builtinTone}`;
+      elements.endSoundSelect.innerHTML = soundOptions(state.config.sound.endSound);
+      renderReminders();
+    }
+
+    function soundChoiceExists(choice) {
+      if (String(choice).startsWith("builtin:")) return ["gentle", "clear", "double", "alert", "quizbell", "servicebell"].includes(String(choice).split(":")[1]);
+      if (String(choice).startsWith("custom:")) return state.config.customSounds.some(sound => sound.id === String(choice).slice(7));
+      return false;
+    }
+
+    function renderCustomSounds() {
+      if (!state.config.customSounds.length) {
+        elements.customSoundList.innerHTML = `<p class="section-note" style="margin:14px 0 0">尚未加入自訂音訊。</p>`;
+        return;
+      }
+      elements.customSoundList.innerHTML = state.config.customSounds.map(sound =>
+        `<div class="sound-card" data-sound-id="${escapeHtml(sound.id)}"><div class="sound-card-head"><div style="min-width:0"><div class="sound-name">${escapeHtml(sound.name)}</div><div class="sound-meta">${escapeHtml(sound.type || "音訊")}・${formatBytes(sound.originalSize || 0)}</div></div><div class="item-actions" style="margin:0"><button class="tiny-btn" type="button" data-sound-action="preview">試聽</button><button class="tiny-btn remove" type="button" data-sound-action="remove">刪除</button></div></div></div>`
+      ).join("");
+    }
+
+    function renderReminders() {
+      if (!state.config.reminders.length) {
+        elements.reminderList.innerHTML = `<p class="section-note" style="margin:0 0 14px">目前沒有自訂時間提醒。</p>`;
+        return;
+      }
+      elements.reminderList.innerHTML = state.config.reminders.map(reminder => {
+        const parts = durationParts(reminder.timeMs);
+        return `<div class="reminder-card" id="reminder-${escapeHtml(reminder.id)}" data-reminder-id="${escapeHtml(reminder.id)}">
+          <label class="check-row"><span>啟用此提醒</span><input type="checkbox" data-reminder-field="enabled"${reminder.enabled ? " checked" : ""}></label>
+          <div class="field-label" style="margin-bottom:7px">剩餘時間</div>
+          <div class="continuous-time-grid"><label>小時<input type="number" min="0" max="999" data-reminder-field="hours" value="${parts.hours}"></label><label>分鐘<input type="number" min="0" max="59" data-reminder-field="minutes" value="${parts.minutes}"></label><label>秒<input type="number" min="0" max="59" data-reminder-field="seconds" value="${parts.seconds}"></label><label>毫秒<input type="number" min="0" max="999" data-reminder-field="milliseconds" value="${parts.milliseconds}"></label></div>
+          <div class="field"><label>使用鈴聲</label><select data-reminder-field="sound">${soundOptions(reminder.sound)}</select></div>
+          <div class="field-row"><div class="field"><label>響鈴次數</label><input type="number" min="1" max="20" data-reminder-field="repeat" value="${reminder.repeat}"></div><div class="field"><label>間隔（秒）</label><input type="number" min="0.1" max="10" step="0.1" data-reminder-field="interval" value="${reminder.intervalMs / 1000}"></div></div>
+          <div class="field"><label>播放倍速</label><input type="number" min="0.25" max="4" step="0.05" data-reminder-field="playbackRate" value="${reminder.playbackRate || 1}"></div>
+          <div class="item-actions"><button class="tiny-btn" type="button" data-reminder-action="preview">試聽</button><button class="tiny-btn remove" type="button" data-reminder-action="remove">刪除</button></div>
+        </div>`;
+      }).join("");
+    }
+
+    function reminderTimeLabel(milliseconds) {
+      const formatted = formatTime(milliseconds);
+      return `${formatted.main}${Number(formatted.ms) === 0 ? "" : formatted.ms}`;
+    }
+
+    function renderFeatureList() {
+      const rows = [
+        { kind: "behavior", key: "autoFullscreen", label: "開始時進入全螢幕", checked: state.config.behavior.autoFullscreen, tab: "appearance", target: "autoFullscreen" },
+        { kind: "behavior", key: "autoFocus", label: "開始時進入專注模式", checked: state.config.behavior.autoFocus, tab: "appearance", target: "autoFocus" },
+        { kind: "behavior", key: "flashEnabled", label: "歸零時畫面閃爍", checked: state.config.behavior.flashEnabled, tab: "appearance", target: "flashEnabled" },
+        { kind: "typography", key: "showMilliseconds", label: "顯示毫秒", checked: state.config.typography.showMilliseconds, tab: "appearance", target: "showMilliseconds" },
+        { kind: "progress", key: "showText", label: "顯示進度條下方文字", checked: state.config.progress.showText, tab: "appearance", target: "showProgressText" },
+        { kind: "progress", key: "showMarker", label: "顯示進度條尾端圓形圖示", checked: state.config.progress.showMarker, tab: "appearance", target: "showProgressMarker" },
+        { kind: "continuous", key: "enabled", label: "連續倒數功能", checked: state.config.continuous.enabled, tab: "continuous", target: "continuousEnabled" },
+        { kind: "continuous", key: "uninterrupted", label: "連續倒數不間斷", checked: state.config.continuous.uninterrupted, tab: "features", target: "feature-continuous-uninterrupted" },
+        { kind: "continuous", key: "autoDismiss", label: "連續倒數間自動關閉【關閉提醒】", checked: state.config.continuous.autoDismiss, tab: "features", target: "feature-continuous-autoDismiss" }
+      ];
+      state.config.quickButtons.forEach(item => rows.push({ kind: "quick", id: item.id, label: `快捷按鈕：${item.label}`, checked: item.enabled, tab: "quick", target: `quick-${item.id}` }));
+      state.config.reminders.forEach(item => rows.push({ kind: "reminder", id: item.id, label: `時間提醒：剩餘${reminderTimeLabel(item.timeMs)}`, checked: item.enabled, tab: "sound", target: `reminder-${item.id}` }));
+      state.config.continuous.items.forEach(item => {
+        rows.push({ kind: "continuousItem", id: item.id, label: `連續排程：${item.name}`, checked: item.enabled, tab: "continuous", target: `continuous-${item.id}` });
+        rows.push({ kind: "continuousReminders", id: item.id, label: `專屬時間提醒：${item.name}`, checked: item.customRemindersEnabled, tab: "continuous", target: `continuous-${item.id}` });
+        item.reminders.forEach(reminder => rows.push({ kind: "continuousReminder", id: reminder.id, parentId: item.id, label: `${item.name}提示鈴：剩餘${reminderTimeLabel(reminder.timeMs)}`, checked: reminder.enabled, tab: "continuous", target: `continuous-${item.id}` }));
+      });
+      elements.featureList.innerHTML = rows.map(row => {
+        const autoDetail = row.kind === "continuous" && row.key === "autoDismiss" && state.config.continuous.autoDismiss
+          ? `<details class="feature-detail" id="autoDismissDetails" open><summary>自動關閉時間</summary><div class="field"><label for="autoDismissSeconds">時間到後幾秒自動關閉</label><input id="autoDismissSeconds" type="number" min="0.5" max="300" step="0.5" value="${state.config.continuous.autoDismissSeconds}"></div></details>` : "";
+        const cardId = `feature-${row.kind}-${row.key || row.id || "item"}`;
+        return `<div class="feature-card" id="${escapeHtml(cardId)}"><label><input type="checkbox" data-feature-kind="${row.kind}" data-feature-key="${row.key || ""}" data-feature-id="${row.id || ""}" data-feature-parent-id="${row.parentId || ""}"${row.checked ? " checked" : ""}><span>${escapeHtml(row.label)}</span></label><button class="tiny-btn" type="button" data-feature-go="${row.tab}" data-feature-target="${escapeHtml(row.target)}">前往設定</button>${autoDetail}</div>`;
+      }).join("");
+    }
+
+    function durationParts(milliseconds) {
+      const safe = Math.max(0, Math.round(milliseconds));
+      return {
+        hours: Math.floor(safe / 3600000), minutes: Math.floor((safe % 3600000) / 60000),
+        seconds: Math.floor((safe % 60000) / 1000), milliseconds: safe % 1000
+      };
+    }
+
+    function renderContinuousReminder(item, reminder) {
+      const parts = durationParts(reminder.timeMs);
+      return `<div class="reminder-card" data-continuous-reminder-id="${escapeHtml(reminder.id)}">
+        <label class="check-row"><span>啟用此提示鈴</span><input type="checkbox" data-continuous-reminder-field="enabled"${reminder.enabled ? " checked" : ""}></label>
+        <div class="field-label">剩餘時間</div>
+        <div class="continuous-time-grid"><label>小時<input type="number" min="0" data-continuous-reminder-field="hours" value="${parts.hours}"></label><label>分鐘<input type="number" min="0" max="59" data-continuous-reminder-field="minutes" value="${parts.minutes}"></label><label>秒<input type="number" min="0" max="59" data-continuous-reminder-field="seconds" value="${parts.seconds}"></label><label>毫秒<input type="number" min="0" max="999" data-continuous-reminder-field="milliseconds" value="${parts.milliseconds}"></label></div>
+        <div class="field"><label>提示鈴聲</label><select data-continuous-reminder-field="sound">${soundOptions(reminder.sound)}</select></div>
+        <div class="reminder-grid"><label>次數<input type="number" min="1" max="20" data-continuous-reminder-field="repeat" value="${reminder.repeat}"></label><label>間隔（秒）<input type="number" min="0.1" max="10" step="0.1" data-continuous-reminder-field="interval" value="${reminder.intervalMs / 1000}"></label><label>倍速<input type="number" min="0.25" max="4" step="0.05" data-continuous-reminder-field="playbackRate" value="${reminder.playbackRate || 1}"></label></div>
+        <div class="item-actions"><button class="tiny-btn" type="button" data-continuous-reminder-action="preview">試聽</button><button class="tiny-btn remove" type="button" data-continuous-reminder-action="remove">刪除</button></div>
+      </div>`;
+    }
+
+    function renderContinuousEditor() {
+      if (!state.config.continuous.items.length) {
+        elements.continuousEditorList.innerHTML = `<p class="section-note" style="margin:12px 0">尚未建立連續倒數排程。</p>`;
+        return;
+      }
+      elements.continuousEditorList.innerHTML = state.config.continuous.items.map((item, index) => {
+        const parts = durationParts(item.durationMs);
+        const reminders = item.reminders.map(reminder => renderContinuousReminder(item, reminder)).join("");
+        return `<div class="continuous-editor${index === state.continuousIndex ? " current" : ""}" id="continuous-${escapeHtml(item.id)}" data-continuous-id="${escapeHtml(item.id)}">
+          <label class="check-row"><span>啟用此連續倒數</span><input type="checkbox" data-continuous-field="enabled"${item.enabled ? " checked" : ""}></label>
+          <div class="continuous-name-row"><div class="field" style="margin:0"><label>倒數名稱</label><input type="text" data-continuous-field="name" value="${escapeHtml(item.name)}"></div><button class="tiny-btn" type="button" data-continuous-action="select">從這裡開始</button></div>
+          <div class="continuous-time-grid"><label>小時<input type="number" min="0" data-continuous-field="hours" value="${parts.hours}"></label><label>分鐘<input type="number" min="0" max="59" data-continuous-field="minutes" value="${parts.minutes}"></label><label>秒<input type="number" min="0" max="59" data-continuous-field="seconds" value="${parts.seconds}"></label><label>毫秒<input type="number" min="0" max="999" data-continuous-field="milliseconds" value="${parts.milliseconds}"></label></div>
+          <div class="field"><label>完成響鈴</label><select data-continuous-field="sound">${soundOptions(item.sound)}</select></div>
+          <div class="reminder-grid"><label>響鈴次數<input type="number" min="1" max="20" data-continuous-field="repeat" value="${item.repeat}"></label><label>間隔（秒）<input type="number" min="0.1" max="10" step="0.1" data-continuous-field="interval" value="${item.intervalMs / 1000}"></label><label>播放倍速<input type="number" min="0.25" max="4" step="0.05" data-continuous-field="playbackRate" value="${item.playbackRate}"></label></div>
+          <div class="item-actions"><button class="tiny-btn" type="button" data-continuous-action="preview">試聽響鈴</button><button class="tiny-btn" type="button" data-continuous-action="toggleReminders">${item.expanded ? "收合自訂提示鈴" : "自訂提示鈴"}</button><button class="tiny-btn" type="button" data-continuous-action="up"${index === 0 ? " disabled" : ""}>上移</button><button class="tiny-btn" type="button" data-continuous-action="down"${index === state.config.continuous.items.length - 1 ? " disabled" : ""}>下移</button><button class="tiny-btn remove" type="button" data-continuous-action="remove">刪除</button></div>
+          <div class="${item.expanded ? "" : "hidden"}" data-continuous-reminders><label class="check-row"><span>啟用此倒數的自訂時間提醒</span><input type="checkbox" data-continuous-field="customRemindersEnabled"${item.customRemindersEnabled ? " checked" : ""}></label>${reminders}<button class="full-btn secondary" type="button" data-continuous-action="addReminder">新增專屬時間提醒</button></div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderEditors() {
+      renderQuickEditor();
+      renderCustomSounds();
+      renderSoundSelectors();
+      renderFeatureList();
+      renderContinuousEditor();
+      renderContinuousSchedule();
+      syncForm();
+      selectElement(state.selectedKey);
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "0KB";
+      if (bytes < 1048576) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+      return `${(bytes / 1048576).toFixed(1)}MB`;
+    }
+
+    function setValue(id, value) {
+      const element = document.getElementById(id);
+      if (!element) return;
+      if (element === document.activeElement && (element.type === "number" || element.type === "text")) return;
+      element.value = value;
+    }
+
+    function setChecked(id, value) {
+      const element = document.getElementById(id);
+      if (element) element.checked = Boolean(value);
+    }
+
+    function updateOutput(id, text) {
+      const element = document.getElementById(id);
+      if (element) element.textContent = text;
+    }
+
+    function syncForm() {
+      const { config } = state;
+      setValue("fontFamily", config.typography.family);
+      setValue("fontWeight", config.typography.weight);
+      setValue("titleSize", config.typography.titleSize);
+      setValue("timeSize", config.typography.timeSize);
+      setValue("millisecondScale", config.typography.millisecondScale);
+      setChecked("showMilliseconds", config.typography.showMilliseconds);
+      setValue("millisecondDigits", config.typography.millisecondDigits);
+      setValue("backgroundColor", config.colors.background);
+      setValue("panelColor", config.colors.panel);
+      setValue("titleColor", config.colors.title);
+      setValue("timeColor", config.colors.time);
+      setValue("millisecondColor", config.colors.milliseconds);
+      setValue("accentColor", config.colors.accent);
+      setValue("primaryTextColor", config.colors.primaryText);
+      setValue("quickColor", config.colors.quick);
+      setValue("quickTextColor", config.colors.quickText);
+      setValue("focusColor", config.colors.focus);
+      setValue("focusTextColor", config.colors.focusText);
+      setValue("progressTrackColor", config.colors.progressTrack);
+      setValue("dangerColor", config.colors.danger);
+      setValue("panelStyle", config.panel.style);
+      setValue("panelRadius", config.panel.radius);
+      setValue("panelWidth", config.panel.width);
+      setValue("panelHeight", config.panel.height);
+      setValue("progressHeight", config.panel.progressHeight);
+      setValue("quickButtonSize", config.panel.quickButtonSize);
+      setValue("actionButtonSize", config.panel.actionButtonSize);
+      setValue("buttonRadius", config.panel.buttonRadius);
+      setValue("startLabel", config.labels.start);
+      setValue("endLabel", config.labels.end);
+      setValue("focusLabel", config.labels.focus);
+      setChecked("autoFullscreen", config.behavior.autoFullscreen);
+      setChecked("autoFocus", config.behavior.autoFocus);
+      setChecked("flashEnabled", config.behavior.flashEnabled);
+      setChecked("showProgressText", config.progress.showText);
+      setChecked("showProgressMarker", config.progress.showMarker);
+      setChecked("continuousEnabled", config.continuous.enabled);
+      setValue("builtinTone", config.sound.builtinTone);
+      setValue("toneVolume", config.sound.volume);
+      setValue("tonePitch", config.sound.pitch);
+      setValue("toneDuration", config.sound.duration);
+      setValue("timeupTitleSize", config.timeup.titleSize);
+      setValue("timeupMessageSize", config.timeup.messageSize);
+      setValue("timeupButtonSize", config.timeup.buttonSize);
+      updateOutput("timeupTitleSizeValue", `${config.timeup.titleSize}px`);
+      updateOutput("timeupMessageSizeValue", `${config.timeup.messageSize}px`);
+      updateOutput("timeupButtonSizeValue", `${config.timeup.buttonSize}px`);
+      setValue("endRepeat", config.sound.endRepeat);
+      setValue("endInterval", config.sound.endIntervalMs / 1000);
+      setValue("endPlaybackRate", config.sound.endPlaybackRate);
+      updateOutput("fontWeightValue", config.typography.weight);
+      updateOutput("titleSizeValue", `${config.typography.titleSize}px`);
+      updateOutput("timeSizeValue", `${config.typography.timeSize}px`);
+      updateOutput("millisecondScaleValue", `${config.typography.millisecondScale}%`);
+      updateOutput("panelRadiusValue", `${config.panel.radius}px`);
+      updateOutput("panelWidthValue", `${config.panel.width}%`);
+      updateOutput("panelHeightValue", `${config.panel.height}%`);
+      updateOutput("progressHeightValue", `${config.panel.progressHeight}px`);
+      updateOutput("quickButtonSizeValue", `${config.panel.quickButtonSize}px`);
+      updateOutput("actionButtonSizeValue", `${config.panel.actionButtonSize}px`);
+      updateOutput("buttonRadiusValue", `${config.panel.buttonRadius}px`);
+      updateOutput("toneVolumeValue", `${config.sound.volume}%`);
+      updateOutput("tonePitchValue", `${config.sound.pitch}Hz`);
+      updateOutput("toneDurationValue", `${config.sound.duration}ms`);
+    }
+
+    const selectedLabels = { panel: "整體區塊", title: "剩餘時間標題", time: "倒數數字", progress: "倒數進度條", quick: "快捷按鈕列", actions: "操作按鈕區", schedule: "連續倒數排程" };
+    const contextRelatedTargets = {
+      panel: [
+        { label: "區塊樣式", tab: "appearance", target: "panelStyle" }, { label: "區塊顏色", tab: "appearance", target: "panelColor" },
+        { label: "圓角", tab: "appearance", target: "panelRadius" }, { label: "寬度", tab: "appearance", target: "panelWidth" }, { label: "高度", tab: "appearance", target: "panelHeight" }
+      ],
+      title: [
+        { label: "標題文字", tab: "appearance", target: "selectedText" }, { label: "標題顏色", tab: "appearance", target: "titleColor" },
+        { label: "標題大小", tab: "appearance", target: "titleSize" }, { label: "整體文字粗細", tab: "appearance", target: "fontWeight" }
+      ],
+      time: [
+        { label: "數字顏色", tab: "appearance", target: "timeColor" }, { label: "毫秒顏色", tab: "appearance", target: "millisecondColor" },
+        { label: "數字大小", tab: "appearance", target: "timeSize" }, { label: "毫秒比例", tab: "appearance", target: "millisecondScale" },
+        { label: "毫秒位數", tab: "appearance", target: "millisecondDigits" }, { label: "顯示毫秒", tab: "appearance", target: "showMilliseconds" }
+      ],
+      progress: [
+        { label: "進度條粗細", tab: "appearance", target: "progressHeight" }, { label: "進度底色", tab: "appearance", target: "progressTrackColor" },
+        { label: "下方文字", tab: "appearance", target: "showProgressText" }, { label: "尾端圓形", tab: "appearance", target: "showProgressMarker" }
+      ],
+      quick: [
+        { label: "快捷按鈕內容", tab: "quick", target: "quickEditorList" }, { label: "文字大小", tab: "appearance", target: "quickButtonSize" },
+        { label: "按鈕顏色", tab: "appearance", target: "quickColor" }, { label: "文字顏色", tab: "appearance", target: "quickTextColor" },
+        { label: "按鈕圓角", tab: "appearance", target: "buttonRadius" }
+      ],
+      actions: [
+        { label: "按鈕大小", tab: "appearance", target: "actionButtonSize" }, { label: "按鈕圓角", tab: "appearance", target: "buttonRadius" },
+        { label: "開始文字", tab: "appearance", target: "startLabel" }, { label: "結束文字", tab: "appearance", target: "endLabel" },
+        { label: "專注文字", tab: "appearance", target: "focusLabel" }, { label: "開始時專注", tab: "appearance", target: "autoFocus" },
+        { label: "開始時全螢幕", tab: "appearance", target: "autoFullscreen" }
+      ],
+      schedule: [
+        { label: "連續排程", tab: "continuous", target: "continuousEditorList" }, { label: "啟用連續倒數", tab: "continuous", target: "continuousEnabled" },
+        { label: "不間斷倒數", tab: "features", target: "feature-continuous-uninterrupted" }, { label: "自動關閉提醒", tab: "features", target: "feature-continuous-autoDismiss" }
+      ]
+    };
+
+    function selectElement(key) {
+      if (!state.config.positions[key]) key = "panel";
+      state.selectedKey = key;
+      $$('[data-edit-key]').forEach(item => item.classList.toggle("selected", item.dataset.editKey === key));
+      elements.selectedName.textContent = selectedLabels[key] || key;
+      const position = state.config.positions[key];
+      elements.moveX.value = position.x;
+      elements.moveY.value = position.y;
+      updateOutput("moveXValue", `${position.x}px`);
+      updateOutput("moveYValue", `${position.y}px`);
+      elements.selectedTextField.classList.toggle("hidden", key !== "title");
+      elements.selectedText.value = key === "title" ? state.config.title : "";
+    }
+
+    function positionContextToolbar(clientX, clientY) {
+      const toolbar = elements.contextToolbar;
+      const margin = 12;
+      const gap = 14;
+      const width = toolbar.offsetWidth || 300;
+      const height = toolbar.offsetHeight || 300;
+      let left = clientX + gap;
+      let top = clientY + gap;
+      if (left + width > window.innerWidth - margin) left = clientX - width - gap;
+      if (top + height > window.innerHeight - margin) top = clientY - height - gap;
+      toolbar.style.left = `${clamp(left, margin, Math.max(margin, window.innerWidth - width - margin))}px`;
+      toolbar.style.top = `${clamp(top, margin, Math.max(margin, window.innerHeight - height - margin))}px`;
+    }
+
+    function syncContextToolbar(key = state.selectedKey) {
+      const style = state.config.blockStyles[key] || {};
+      const isTransparent = style.background === "transparent" || (!style.background && key !== "panel");
+      elements.contextTitle.textContent = `${selectedLabels[key] || "區塊"}快捷設定`;
+      elements.contextFontColor.value = effectiveBlockFontColor(key);
+      elements.contextFontSize.value = Math.round(effectiveBlockFontSize(key));
+      elements.contextFontFamily.value = style.fontFamily || state.config.typography.family;
+      elements.contextFontWeight.value = style.fontWeight || state.config.typography.weight;
+      elements.contextMoveX.value = state.config.positions[key].x;
+      elements.contextMoveY.value = state.config.positions[key].y;
+      elements.contextBackgroundTransparent.checked = isTransparent;
+      elements.contextBackgroundColor.value = style.background && style.background !== "transparent" ? style.background : key === "panel" ? state.config.colors.panel : "#ffffff";
+      elements.contextBackgroundColor.disabled = isTransparent;
+      elements.contextRelatedLinks.innerHTML = (contextRelatedTargets[key] || []).map((destination, index) =>
+        `<button class="context-link" type="button" data-context-destination="${index}">${escapeHtml(destination.label)}</button>`
+      ).join("");
+    }
+
+    function showContextToolbar(key, clientX, clientY) {
+      if (!document.body.classList.contains("editing")) return;
+      selectElement(key);
+      syncContextToolbar(key);
+      elements.contextToolbar.classList.add("show");
+      positionContextToolbar(clientX, clientY);
+    }
+
+    function hideContextToolbar() {
+      elements.contextToolbar.classList.remove("show");
+    }
+
+    function updateContextStyle() {
+      const style = state.config.blockStyles[state.selectedKey] ||= {};
+      style.fontColor = elements.contextFontColor.value;
+      style.fontSize = clamp(Number(elements.contextFontSize.value) || effectiveBlockFontSize(state.selectedKey), 12, 320);
+      style.fontFamily = elements.contextFontFamily.value;
+      style.fontWeight = clamp(Math.round((Number(elements.contextFontWeight.value) || state.config.typography.weight) / 50) * 50, 400, 900);
+      style.background = elements.contextBackgroundTransparent.checked ? "transparent" : elements.contextBackgroundColor.value;
+      elements.contextBackgroundColor.disabled = elements.contextBackgroundTransparent.checked;
+      updateSelectedPosition("x", elements.contextMoveX.value);
+      updateSelectedPosition("y", elements.contextMoveY.value);
+      applyBlockStyles();
+      scheduleSave();
+    }
+
+    function highlightSettingsTarget(target) {
+      if (!target) return;
+      $$(".settings-highlight").forEach(item => item.classList.remove("settings-highlight"));
+      const highlightTarget = target.closest(".field,.check-row,.quick-editor,.reminder-card,.continuous-editor,.feature-card,.section") || target;
+      highlightTarget.classList.add("settings-highlight");
+      const marker = String(Date.now());
+      highlightTarget.dataset.highlightMarker = marker;
+      setTimeout(() => {
+        if (highlightTarget.dataset.highlightMarker === marker) {
+          highlightTarget.classList.remove("settings-highlight");
+          delete highlightTarget.dataset.highlightMarker;
+        }
+      }, 3000);
+    }
+
+    function jumpToSettings(destination) {
+      if (!destination) return;
+      switchTab(destination.tab);
+      hideContextToolbar();
+      setTimeout(() => {
+        const target = document.getElementById(destination.target);
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+        target?.focus?.({ preventScroll: true });
+        highlightSettingsTarget(target);
+      }, 40);
+    }
+
+    function jumpToSelectedSettings() {
+      jumpToSettings((contextRelatedTargets[state.selectedKey] || contextRelatedTargets.panel)[0]);
+    }
+
+    function updateSelectedPosition(axis, value) {
+      const position = state.config.positions[state.selectedKey];
+      position[axis] = clamp(Math.round(Number(value) || 0), axis === "x" ? -400 : -300, axis === "x" ? 400 : 300);
+      const item = document.querySelector(`[data-edit-key="${state.selectedKey}"]`);
+      if (item) item.style.setProperty(axis === "x" ? "--move-x" : "--move-y", `${position[axis]}px`);
+      if (axis === "x") { elements.moveX.value = position.x; updateOutput("moveXValue", `${position.x}px`); }
+      else { elements.moveY.value = position.y; updateOutput("moveYValue", `${position.y}px`); }
+      scheduleSave();
+    }
+
+    function setEditing(enabled) {
+      document.body.classList.toggle("editing", enabled);
+      elements.settingsButton.setAttribute("aria-expanded", String(enabled));
+      if (enabled) {
+        renderEditors();
+        showToast("點擊或拖動畫面元素即可調整");
+      } else {
+        hideContextToolbar();
+        if (state.previewingTimeup) dismissTimeupAlert();
+        $$("[data-edit-key]").forEach(item => item.classList.remove("selected"));
+        saveNow();
+      }
+    }
+
+    function switchTab(tab) {
+      $$(".tab-btn").forEach(button => button.classList.toggle("active", button.dataset.tab === tab));
+      $$(".tab-panel").forEach(panel => panel.classList.toggle("active", panel.dataset.panel === tab));
+    }
+
+    function updateRunControls() {
+      document.body.classList.toggle("counting", state.running);
+      elements.startButton.textContent = state.running ? state.config.labels.end : state.config.labels.start;
+      elements.startButton.style.background = state.running ? state.config.colors.danger : state.config.colors.accent;
+      elements.focusButton.classList.toggle("hidden", !state.running);
+      elements.settingsButton.disabled = false;
+    }
+
+    async function requestWakeLock() {
+      if (!("wakeLock" in navigator)) return;
+      try { state.wakeLock = await navigator.wakeLock.request("screen"); } catch (_) { /* Device policy may block wake lock. */ }
+    }
+
+    async function releaseWakeLock() {
+      if (!state.wakeLock) return;
+      try { await state.wakeLock.release(); } catch (_) { /* Already released. */ }
+      state.wakeLock = null;
+    }
+
+    async function startCountdown(continuation = false) {
+      if (state.running) { endCountdown(false); return; }
+      if (state.starting) return;
+      if (state.remainingMs <= 0 && !continuation && getCurrentContinuousItem()) {
+        const first = enabledContinuousEntries().find(entry => entry.item.durationMs > 0);
+        if (first) selectContinuousIndex(first.index, false);
+      }
+      if (state.remainingMs <= 0) {
+        showToast("請先使用快捷按鈕增加倒數時間");
+        return;
+      }
+      state.starting = true;
+      const audioReady = ensureAudioContext();
+      let fullscreenRequest = null;
+      if (!continuation && state.config.behavior.autoFullscreen && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+        try { fullscreenRequest = document.documentElement.requestFullscreen(); } catch (_) { showToast("瀏覽器未允許全螢幕，倒數仍會繼續"); }
+      }
+      try {
+        await audioReady;
+        if (fullscreenRequest) {
+          try { await fullscreenRequest; } catch (_) { showToast("瀏覽器未允許全螢幕，倒數仍會繼續"); }
+        }
+      } finally { state.starting = false; }
+      if (state.running) return;
+      state.running = true;
+      if (!continuation) state.completedContinuousIds.clear();
+      state.totalMs = state.remainingMs;
+      state.previousRemainingMs = state.remainingMs;
+      state.endAt = performance.now() + state.remainingMs;
+      state.firedReminders.clear();
+      updateRunControls();
+      requestWakeLock();
+      tick();
+      if (state.config.behavior.autoFocus && !elements.timeupOverlay.classList.contains("show")) setTimeout(enterFocusMode, 220);
+    }
+
+    function endCountdown(completed) {
+      cancelAnimationFrame(state.raf);
+      state.running = false;
+      releaseWakeLock();
+      exitFocusMode();
+      if (!completed) {
+        state.remainingMs = state.totalMs;
+        state.previousRemainingMs = state.remainingMs;
+        if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      }
+      updateRunControls();
+      renderTime();
+      renderContinuousSchedule();
+    }
+
+    function tick(now = performance.now()) {
+      if (!state.running) return;
+      const nextRemaining = Math.max(0, state.endAt - now);
+      checkReminders(state.previousRemainingMs, nextRemaining);
+      state.previousRemainingMs = nextRemaining;
+      state.remainingMs = nextRemaining;
+      renderTime();
+      if (nextRemaining <= 0) {
+        handleCountdownComplete();
+        return;
+      }
+      cancelAnimationFrame(state.raf);
+      state.raf = requestAnimationFrame(tick);
+    }
+
+    function updateRunningTime(newValue) {
+      const newRemaining = Math.max(0, Number(newValue) || 0);
+      const actualDelta = newRemaining - state.remainingMs;
+      state.endAt += actualDelta;
+      if (actualDelta > 0) state.totalMs = Math.max(state.totalMs, newRemaining);
+      state.remainingMs = newRemaining;
+      state.previousRemainingMs = newRemaining;
+      return newRemaining;
+    }
+
+    function adjustTime(deltaMs) {
+      const delta = Number(deltaMs) || 0;
+      if (state.running) {
+        const newRemaining = updateRunningTime(state.remainingMs + delta);
+        if (newRemaining <= 0) {
+          handleCountdownComplete();
+        }
+      } else {
+        state.remainingMs = Math.max(0, state.remainingMs + delta);
+        state.totalMs = Math.max(state.remainingMs, 1);
+        state.config.durationMs = state.remainingMs;
+        scheduleSave();
+      }
+      renderTime();
+    }
+
+    function openTimeEditor() {
+      if (document.body.classList.contains("editing") || elements.timeupOverlay.classList.contains("show")) return;
+      const parts = durationParts(state.remainingMs);
+      elements.directHours.value = parts.hours;
+      elements.directMinutes.value = parts.minutes;
+      elements.directSeconds.value = parts.seconds;
+      elements.directMilliseconds.value = parts.milliseconds;
+      elements.timeEditorOverlay.classList.add("show");
+      setTimeout(() => { elements.directHours.focus(); elements.directHours.select(); }, 30);
+    }
+
+    function closeTimeEditor() {
+      elements.timeEditorOverlay.classList.remove("show");
+      elements.timeDisplay.focus({ preventScroll: true });
+    }
+
+    function applyDirectTime() {
+      const hours = clamp(Number(elements.directHours.value) || 0, 0, 999);
+      const minutes = clamp(Number(elements.directMinutes.value) || 0, 0, 59);
+      const seconds = clamp(Number(elements.directSeconds.value) || 0, 0, 59);
+      const milliseconds = clamp(Number(elements.directMilliseconds.value) || 0, 0, 999);
+      const newRemaining = hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
+      if (state.running) {
+        updateRunningTime(newRemaining);
+        closeTimeEditor();
+        if (newRemaining <= 0) handleCountdownComplete();
+        else renderTime();
+      } else {
+        state.remainingMs = newRemaining;
+        state.totalMs = Math.max(newRemaining, 1);
+        state.previousRemainingMs = newRemaining;
+        const activeItem = getCurrentContinuousItem();
+        if (activeItem) activeItem.durationMs = newRemaining;
+        else state.config.durationMs = newRemaining;
+        closeTimeEditor();
+        renderTime(); renderContinuousEditor(); scheduleSave();
+      }
+      showToast("倒數時間已更新");
+    }
+
+    function enterFocusMode() {
+      if (!state.running) return;
+      setEditing(false);
+      document.body.classList.add("focus-mode");
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        try {
+          document.documentElement.requestFullscreen()
+            .then(() => { state.focusFullscreen = true; })
+            .catch(() => showToast("瀏覽器未允許全螢幕，請再點一次「專注倒數」"));
+        } catch (_) { /* Fullscreen unsupported. */ }
+      }
+      clearTimeout(state.focusListenerTimer);
+      state.focusListenerTimer = setTimeout(() => document.addEventListener("pointerdown", exitFocusFromTap, { once: true, capture: true }), 160);
+    }
+
+    function exitFocusFromTap(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      exitFocusMode();
+      if (state.focusFullscreen && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      state.focusFullscreen = false;
+      const suppressClick = clickEvent => { clickEvent.preventDefault(); clickEvent.stopPropagation(); };
+      document.addEventListener("click", suppressClick, { capture: true, once: true });
+      setTimeout(() => document.removeEventListener("click", suppressClick, true), 600);
+    }
+
+    function exitFocusMode() {
+      clearTimeout(state.focusListenerTimer);
+      document.body.classList.remove("focus-mode");
+      document.removeEventListener("pointerdown", exitFocusFromTap, true);
+    }
+
+    function nextContinuousEntry() {
+      const entries = enabledContinuousEntries();
+      const currentPosition = entries.findIndex(entry => entry.index === state.continuousIndex);
+      return currentPosition >= 0 ? entries[currentPosition + 1] || null : null;
+    }
+
+    function handleCountdownComplete() {
+      const continuousItem = getCurrentContinuousItem();
+      if (!continuousItem) {
+        endCountdown(true);
+        showTimeupAlert({ title: "時間到", message: "本次倒數已結束" });
+        return;
+      }
+      cancelAnimationFrame(state.raf);
+      state.running = false;
+      state.remainingMs = 0;
+      state.previousRemainingMs = 0;
+      state.completedContinuousIds.add(continuousItem.id);
+      releaseWakeLock();
+      exitFocusMode();
+      updateRunControls();
+      renderTime();
+      renderContinuousSchedule();
+      const next = nextContinuousEntry();
+      state.pendingContinuousAdvance = Boolean(next && !state.config.continuous.uninterrupted);
+      showTimeupAlert({
+        title: `${continuousItem.name}完成`,
+        message: next ? `下一個：${next.item.name}` : "所有連續倒數已完成",
+        sound: continuousItem.sound, repeat: continuousItem.repeat,
+        intervalMs: continuousItem.intervalMs, playbackRate: continuousItem.playbackRate,
+        hasNext: Boolean(next)
+      });
+      if (next && state.config.continuous.uninterrupted) startNextContinuous(next.index);
+    }
+
+    function startNextContinuous(index) {
+      const item = state.config.continuous.items[index];
+      if (!item?.enabled) return;
+      state.continuousIndex = index;
+      state.pendingContinuousAdvance = false;
+      state.remainingMs = item.durationMs;
+      state.totalMs = Math.max(item.durationMs, 1);
+      state.previousRemainingMs = item.durationMs;
+      state.firedReminders.clear();
+      applyAppearance();
+      renderTime();
+      renderContinuousSchedule();
+      renderContinuousEditor();
+      if (item.durationMs > 0) void startCountdown(true);
+    }
+
+    function selectContinuousIndex(index, startImmediately = false) {
+      const item = state.config.continuous.items[index];
+      if (!item?.enabled) return;
+      const wasRunning = state.running;
+      if (wasRunning) {
+        cancelAnimationFrame(state.raf);
+        state.running = false;
+        releaseWakeLock();
+      }
+      clearTimeout(state.autoDismissTimer);
+      elements.timeupOverlay.classList.remove("show");
+      document.body.classList.remove("flash-alert");
+      stopAllAudio();
+      state.continuousIndex = index;
+      state.completedContinuousIds.clear();
+      state.remainingMs = item.durationMs;
+      state.totalMs = Math.max(item.durationMs, 1);
+      state.previousRemainingMs = item.durationMs;
+      state.firedReminders.clear();
+      applyAppearance(); renderTime(); renderContinuousSchedule(); renderContinuousEditor(); updateRunControls();
+      if ((startImmediately || wasRunning) && item.durationMs > 0) void startCountdown(true);
+    }
+
+    function showTimeupAlert(options = {}) {
+      stopAllAudio();
+      state.previewingTimeup = false;
+      elements.timeupOverlay.classList.remove("preview");
+      elements.timeupTitle.textContent = options.title || "時間到";
+      elements.timeupMessage.textContent = options.message || "本次倒數已結束";
+      elements.timeupOverlay.classList.add("show");
+      document.body.classList.toggle("flash-alert", state.config.behavior.flashEnabled);
+      playSoundChoice(options.sound || state.config.sound.endSound, options.repeat || state.config.sound.endRepeat, options.intervalMs || state.config.sound.endIntervalMs, options.playbackRate || state.config.sound.endPlaybackRate);
+      clearTimeout(state.autoDismissTimer);
+      if (options.hasNext && state.config.continuous.autoDismiss) {
+        state.autoDismissTimer = setTimeout(dismissTimeupAlert, state.config.continuous.autoDismissSeconds * 1000);
+      }
+    }
+
+    function dismissTimeupAlert() {
+      if (state.previewingTimeup) {
+        state.previewingTimeup = false;
+        elements.timeupOverlay.classList.remove("show", "preview");
+        return;
+      }
+      elements.timeupOverlay.classList.remove("show");
+      document.body.classList.remove("flash-alert");
+      clearTimeout(state.autoDismissTimer);
+      stopAllAudio();
+      const shouldAdvance = state.pendingContinuousAdvance;
+      const next = shouldAdvance ? nextContinuousEntry() : null;
+      state.pendingContinuousAdvance = false;
+      if (next) startNextContinuous(next.index);
+      else if (state.running && state.config.behavior.autoFocus) setTimeout(enterFocusMode, 180);
+      if (!state.running && !next && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    }
+
+    function checkReminders(previous, current) {
+      const activeItem = getCurrentContinuousItem();
+      const activeReminders = activeItem?.customRemindersEnabled ? activeItem.reminders : [];
+      [...state.config.reminders, ...activeReminders].forEach(reminder => {
+        if (!reminder.enabled || state.firedReminders.has(reminder.id)) return;
+        if (previous >= reminder.timeMs && current <= reminder.timeMs) {
+          state.firedReminders.add(reminder.id);
+          playSoundChoice(reminder.sound, reminder.repeat, reminder.intervalMs, reminder.playbackRate || 1, true);
+          showToast(`剩餘${formatTime(reminder.timeMs).main}提醒`);
+        }
+      });
+    }
+
+    // 建立並喚醒音訊裝置。剛建立或剛恢復時，音效卡／藍牙耳機需要一點時間才會真正出聲，
+    // 所以記錄 audioReadyAt，第一聲會排在這個時間之後，避免第一下被吃掉。
+    async function ensureAudioContext() {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return null;
+      let wokeUp = false;
+      if (!state.audioContext) {
+        try { state.audioContext = new AudioContextClass({ latencyHint: "interactive" }); }
+        catch (_) { state.audioContext = new AudioContextClass(); }
+        wokeUp = true;
+      }
+      const context = state.audioContext;
+      if (context.state !== "running") {
+        try { await context.resume(); } catch (_) { /* A later user gesture can resume it. */ }
+        wokeUp = true;
+      }
+      if (context.state !== "running") return context;
+      startAudioKeepAlive(context);
+      if (wokeUp) state.audioReadyAt = Math.max(state.audioReadyAt, context.currentTime + .35);
+      return context;
+    }
+
+    // 持續輸出人耳聽不到的極小訊號，讓音訊裝置不進入省電休眠，之後每一聲都能立即發出。
+    function startAudioKeepAlive(context) {
+      if (state.audioKeepAlive) return;
+      try {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.frequency.value = 30;
+        gain.gain.value = .00002;
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start();
+        state.audioKeepAlive = { oscillator, gain };
+      } catch (_) { /* Keep-alive is optional. */ }
+    }
+
+    function firstStrikeTime(context) {
+      return Math.max(context.currentTime + .05, state.audioReadyAt);
+    }
+
+    function trackAudioNode(oscillator, gain) {
+      const entry = { oscillator, gain };
+      state.activeNodes.add(entry);
+      oscillator.addEventListener("ended", () => {
+        state.activeNodes.delete(entry);
+        try { gain.disconnect(); } catch (_) { /* Already disconnected. */ }
+      }, { once: true });
+    }
+
+    function stopBuiltinNodes() {
+      state.activeNodes.forEach(({ oscillator, gain }) => {
+        try { oscillator.stop(); } catch (_) { /* Not started or already stopped. */ }
+        try { gain.disconnect(); } catch (_) { /* Already disconnected. */ }
+      });
+      state.activeNodes.clear();
+    }
+
+    // 在 AudioContext 時間軸的 startAt 排程一聲內建鈴聲，回傳該聲長度（秒）。
+    function scheduleBuiltinStrike(context, kind, playbackRate, startAt) {
+      const speed = clamp(Number(playbackRate) || 1, .25, 4);
+      const volume = clamp(state.config.sound.volume, 0, 100) / 100;
+      const start = Math.max(context.currentTime, startAt);
+
+      if (kind === "servicebell") {
+        const pitchScale = clamp(state.config.sound.pitch / 660, .5, 2);
+        const ringDuration = clamp(state.config.sound.duration * 4.5, 700, 1700) / 1000 / speed;
+        const partials = [
+          { hz: 4805, level: .2, decay: 1, tail: .045 },
+          { hz: 2695, level: .095, decay: 1.04, tail: .07 },
+          { hz: 1055, level: .023, decay: 1.02, tail: .08 },
+          { hz: 914, level: .018, decay: .95, tail: .065 },
+          { hz: 3398, level: .075, decay: .56, tail: .025 },
+          { hz: 2977, level: .025, decay: .62, tail: .025 },
+          { hz: 2297, level: .016, decay: .7, tail: .03 },
+          { hz: 3773, level: .11, decay: .28, tail: .012 },
+          { hz: 4711, level: .09, decay: .25, tail: .012 },
+          { hz: 3820, level: .08, decay: .3, tail: .014 },
+          { hz: 3891, level: .06, decay: .25, tail: .012 },
+          { hz: 4102, level: .055, decay: .24, tail: .01 },
+          { hz: 3984, level: .045, decay: .28, tail: .012 },
+          { hz: 4594, level: .04, decay: .3, tail: .014 },
+          { hz: 4336, level: .04, decay: .32, tail: .015 },
+          { hz: 5156, level: .024, decay: .4, tail: .018 }
+        ];
+        partials.forEach((partial, index) => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          const at = start + index * .00012;
+          const attackEnd = at + .012 / speed;
+          const releaseAt = at + Math.max(.08, ringDuration * partial.decay);
+          const decayAt = Math.max(attackEnd + .02, releaseAt - Math.min(.12 / speed, (releaseAt - attackEnd) * .28));
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(clamp(partial.hz * pitchScale, 120, 7200), at);
+          gain.gain.setValueAtTime(.0001, at);
+          gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * partial.level), attackEnd);
+          gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * partial.level * partial.tail), decayAt);
+          gain.gain.exponentialRampToValueAtTime(.0001, releaseAt);
+          oscillator.connect(gain).connect(context.destination);
+          oscillator.start(at);
+          oscillator.stop(releaseAt + .025);
+          trackAudioNode(oscillator, gain);
+        });
+        return ringDuration + .06;
+      }
+
+      if (kind === "quizbell") {
+        const baseFrequency = clamp(state.config.sound.pitch * 1.05, 260, 1600);
+        const ringDuration = clamp(state.config.sound.duration * 3, 360, 1800) / 1000 / speed;
+        const partials = [
+          { ratio: 1, level: .3, decay: 1, type: "sine" },
+          { ratio: 1.49, level: .19, decay: .76, type: "triangle" },
+          { ratio: 2.12, level: .13, decay: .58, type: "sine" },
+          { ratio: 2.78, level: .09, decay: .42, type: "triangle" },
+          { ratio: 3.43, level: .055, decay: .27, type: "sine" }
+        ];
+        partials.forEach((partial, index) => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          const at = start + index * .0007;
+          const releaseAt = at + Math.max(.04, ringDuration * partial.decay);
+          oscillator.type = partial.type;
+          oscillator.frequency.setValueAtTime(clamp(baseFrequency * partial.ratio, 100, 5200), at);
+          gain.gain.setValueAtTime(.0001, at);
+          gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * partial.level), at + .006 / speed);
+          gain.gain.exponentialRampToValueAtTime(.0001, releaseAt);
+          oscillator.connect(gain).connect(context.destination);
+          oscillator.start(at);
+          oscillator.stop(releaseAt + .025);
+          trackAudioNode(oscillator, gain);
+        });
+        return ringDuration + .07;
+      }
+
+      const patterns = { gentle: [1, 1.25], clear: [1], double: [1, 1.34], alert: [1, .82, 1.16] };
+      const pattern = patterns[kind] || patterns.gentle;
+      const duration = clamp(state.config.sound.duration, 80, 1200) / 1000 / speed;
+      pattern.forEach((factor, index) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const at = start + index * (duration + .06 / speed);
+        oscillator.type = kind === "gentle" ? "sine" : kind === "alert" ? "square" : "triangle";
+        oscillator.frequency.setValueAtTime(clamp(state.config.sound.pitch * factor, 100, 3000), at);
+        gain.gain.setValueAtTime(.0001, at);
+        gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * .22), at + .025 / speed);
+        gain.gain.exponentialRampToValueAtTime(.0001, at + duration);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(at);
+        oscillator.stop(at + duration + .03);
+        trackAudioNode(oscillator, gain);
+      });
+      return pattern.length * (duration + .06 / speed) + .04;
+    }
+
+    async function playBuiltinOnce(kind, playbackRate = 1, generation = state.soundGeneration) {
+      const context = await ensureAudioContext();
+      if (!context || generation !== state.soundGeneration) return;
+      const startAt = firstStrikeTime(context);
+      const length = scheduleBuiltinStrike(context, kind, playbackRate, startAt);
+      await waitForSound((startAt - context.currentTime + length) * 1000, generation);
+    }
+
+    async function getCustomSoundUrl(sound) {
+      if (state.audioUrls.has(sound.id)) return state.audioUrls.get(sound.id);
+      let bytes = base64ToBytes(sound.data);
+      if (sound.encoding === "gzip-base64" && "DecompressionStream" in window) {
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+        bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+      }
+      const url = URL.createObjectURL(new Blob([bytes], { type: sound.type || "audio/*" }));
+      state.audioUrls.set(sound.id, url);
+      return url;
+    }
+
+    async function playCustomOnce(id, playbackRate = 1, generation = state.soundGeneration) {
+      const sound = state.config.customSounds.find(item => item.id === id);
+      if (!sound) { showToast("找不到指定的自訂音訊"); return; }
+      try {
+        const audio = new Audio(await getCustomSoundUrl(sound));
+        if (generation !== state.soundGeneration) return;
+        audio.volume = clamp(state.config.sound.volume, 0, 100) / 100;
+        audio.playbackRate = clamp(Number(playbackRate) || 1, .25, 4);
+        state.activeAudios.add(audio);
+        await new Promise(resolve => {
+          let finished = false;
+          const finish = () => { if (finished) return; finished = true; state.activeAudios.delete(audio); resolve(); };
+          audio.addEventListener("ended", finish, { once: true });
+          audio.addEventListener("error", finish, { once: true });
+          audio.addEventListener("pause", () => { if (generation !== state.soundGeneration) finish(); }, { once: true });
+          audio.play().catch(() => { finish(); showToast("音訊無法播放，請改用其他格式或內建鈴聲"); });
+        });
+      } catch (_) {
+        showToast("音訊無法播放，請改用其他格式或內建鈴聲");
+      }
+    }
+
+    function waitForSound(milliseconds, generation) {
+      return new Promise(resolve => {
+        const timer = setTimeout(() => resolve(generation === state.soundGeneration), Math.max(0, milliseconds));
+        state.alertTimers.push(timer);
+      });
+    }
+
+    // 間隔＝每一聲「開始」之間的時間；不等前一聲播完，聲音可以重疊。
+    // overlap 為 true 時不會先停止正在播放的聲音（用於快速連點試聽）。
+    function playSoundChoice(choice, repeat = 1, intervalMs = 800, playbackRate = 1, overlap = false) {
+      if (!overlap) stopAllAudio();
+      const count = clamp(Number(repeat) || 1, 1, 20);
+      const interval = clamp(Number(intervalMs) || 800, 100, 10000);
+      const speed = clamp(Number(playbackRate) || 1, .25, 4);
+      const generation = state.soundGeneration;
+      let value = String(choice || "");
+      if (value.startsWith("custom:") && !state.config.customSounds.some(sound => sound.id === value.slice(7))) {
+        showToast("找不到指定的自訂音訊，已改用內建鈴聲");
+        value = `builtin:${state.config.sound.builtinTone}`;
+      }
+      void (async () => {
+        if (value.startsWith("custom:")) {
+          const id = value.slice(7);
+          const sound = state.config.customSounds.find(item => item.id === id);
+          try { await getCustomSoundUrl(sound); } catch (_) { /* playCustomOnce reports errors. */ }
+          const context = await ensureAudioContext();
+          if (generation !== state.soundGeneration) return;
+          const lead = context ? Math.max(0, (state.audioReadyAt - context.currentTime) * 1000) : 0;
+          for (let index = 0; index < count; index += 1) {
+            const timer = setTimeout(() => {
+              if (generation === state.soundGeneration) void playCustomOnce(id, speed, generation);
+            }, lead + index * interval);
+            state.alertTimers.push(timer);
+          }
+          return;
+        }
+        const kind = value.split(":")[1] || state.config.sound.builtinTone;
+        const context = await ensureAudioContext();
+        if (!context || generation !== state.soundGeneration) return;
+        const base = firstStrikeTime(context);
+        for (let index = 0; index < count; index += 1) {
+          scheduleBuiltinStrike(context, kind, speed, base + index * interval / 1000);
+        }
+      })();
+    }
+
+    function stopScheduledAudio() {
+      state.alertTimers.forEach(clearTimeout);
+      state.alertTimers = [];
+    }
+
+    function stopAllAudio() {
+      state.soundGeneration += 1;
+      stopScheduledAudio();
+      state.activeAudios.forEach(audio => { audio.pause(); audio.currentTime = 0; });
+      state.activeAudios.clear();
+      stopBuiltinNodes();
+    }
+
+    async function compressAudioFile(file) {
+      let bytes = new Uint8Array(await file.arrayBuffer());
+      let encoding = "base64";
+      if ("CompressionStream" in window && "DecompressionStream" in window) {
+        try {
+          const compressedStream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+          const compressed = new Uint8Array(await new Response(compressedStream).arrayBuffer());
+          if (compressed.length < bytes.length) { bytes = compressed; encoding = "gzip-base64"; }
+        } catch (_) { /* Base64 fallback remains valid. */ }
+      }
+      return { encoding, data: bytesToBase64(bytes) };
+    }
+
+    function bytesToBase64(bytes) {
+      let binary = "";
+      const chunkSize = 32768;
+      for (let index = 0; index < bytes.length; index += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+      }
+      return btoa(binary);
+    }
+
+    function base64ToBytes(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      return bytes;
+    }
+
+    async function handleSoundUpload(files) {
+      const selected = [...files];
+      if (!selected.length) return;
+      await ensureAudioContext();
+      for (const file of selected) {
+        if (file.size > 15 * 1024 * 1024) {
+          showToast(`${file.name}超過15MB，已略過`, 3600);
+          continue;
+        }
+        showToast(`正在加入${file.name}`);
+        try {
+          const encoded = await compressAudioFile(file);
+          state.config.customSounds.push({
+            id: uniqueId("sound"), name: file.name, type: file.type || "audio/*",
+            originalSize: file.size, encoding: encoded.encoding, data: encoded.data
+          });
+        } catch (_) {
+          showToast(`${file.name}讀取失敗`);
+        }
+      }
+      renderCustomSounds();
+      renderSoundSelectors();
+      renderContinuousEditor();
+      scheduleSave();
+      if (!state.fileHandle) showToast("音訊已加入，請連結CSV或下載備份以永久保存", 4200);
+      else showToast("自訂音訊已加入並儲存");
+    }
+
+    function removeCustomSound(id) {
+      const sound = state.config.customSounds.find(item => item.id === id);
+      if (!sound) return;
+      state.config.customSounds = state.config.customSounds.filter(item => item.id !== id);
+      const url = state.audioUrls.get(id);
+      if (url) URL.revokeObjectURL(url);
+      state.audioUrls.delete(id);
+      state.config.reminders.forEach(reminder => {
+        if (reminder.sound === `custom:${id}`) reminder.sound = `builtin:${state.config.sound.builtinTone}`;
+      });
+      state.config.continuous.items.forEach(item => {
+        if (item.sound === `custom:${id}`) item.sound = `builtin:${state.config.sound.builtinTone}`;
+        item.reminders.forEach(reminder => { if (reminder.sound === `custom:${id}`) reminder.sound = `builtin:${state.config.sound.builtinTone}`; });
+      });
+      if (state.config.sound.endSound === `custom:${id}`) state.config.sound.endSound = `builtin:${state.config.sound.builtinTone}`;
+      renderCustomSounds();
+      renderSoundSelectors();
+      renderContinuousEditor();
+      scheduleSave();
+    }
+
+    function addReminder() {
+      state.config.reminders.push({
+        id: uniqueId("reminder"), timeMs: 60000, sound: `builtin:${state.config.sound.builtinTone}`,
+        repeat: 1, intervalMs: 800, playbackRate: 1, enabled: true
+      });
+      renderReminders();
+      scheduleSave();
+    }
+
+    function csvEscape(value) {
+      return `"${String(value ?? "").replace(/"/g, '""')}"`;
+    }
+
+    function serializeDatabase() {
+      const configWithoutSounds = clone(state.config);
+      delete configWithoutSounds.customSounds;
+      const rows = [
+        ["category", "key", "value"],
+        ["meta", "version", String(state.config.version || 1)],
+        ["settings", "config", JSON.stringify(configWithoutSounds)]
+      ];
+      state.config.customSounds.forEach(sound => rows.push(["sound", sound.id, JSON.stringify(sound)]));
+      return "\uFEFF" + rows.map((row, index) => index === 0 ? row.join(",") : row.map(csvEscape).join(",")).join("\r\n") + "\r\n";
+    }
+
+    function parseCsv(text) {
+      const input = String(text).replace(/^\uFEFF/, "");
+      const rows = [];
+      let row = [], field = "", quoted = false;
+      for (let index = 0; index < input.length; index += 1) {
+        const char = input[index];
+        if (quoted) {
+          if (char === '"' && input[index + 1] === '"') { field += '"'; index += 1; }
+          else if (char === '"') quoted = false;
+          else field += char;
+        } else if (char === '"') quoted = true;
+        else if (char === ",") { row.push(field); field = ""; }
+        else if (char === "\n") { row.push(field.replace(/\r$/, "")); rows.push(row); row = []; field = ""; }
+        else field += char;
+      }
+      if (field || row.length) { row.push(field); rows.push(row); }
+      return rows;
+    }
+
+    function parseDatabase(text) {
+      const rows = parseCsv(text);
+      const configRow = rows.find(row => row[0] === "settings" && row[1] === "config");
+      if (!configRow) throw new Error("CSV內找不到設定資料");
+      const incoming = JSON.parse(configRow[2]);
+      incoming.customSounds = rows.filter(row => row[0] === "sound").map(row => JSON.parse(row[2]));
+      return mergeConfig(DEFAULT_CONFIG, incoming);
+    }
+
+    function localBackupConfig() {
+      const safe = clone(state.config);
+      safe.customSounds = [];
+      return safe;
+    }
+
+    function saveLocalBackup() {
+      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(localBackupConfig())); } catch (_) { /* CSV remains authoritative. */ }
+    }
+
+    function loadLocalBackup() {
+      try {
+        const value = localStorage.getItem(LOCAL_KEY);
+        if (value) state.config = mergeConfig(DEFAULT_CONFIG, JSON.parse(value));
+      } catch (_) { state.config = clone(DEFAULT_CONFIG); }
+    }
+
+    function scheduleSave() {
+      saveLocalBackup();
+      clearTimeout(state.saveTimer);
+      state.saveTimer = setTimeout(saveNow, 550);
+    }
+
+    async function saveNow() {
+      clearTimeout(state.saveTimer);
+      saveLocalBackup();
+      if (!state.fileHandle) { updateDbStatus("local"); return; }
+      if (state.saving) { state.pendingSave = true; return; }
+      state.saving = true;
+      try {
+        do {
+          state.pendingSave = false;
+          const writable = await state.fileHandle.createWritable();
+          await writable.write(serializeDatabase());
+          await writable.close();
+        } while (state.pendingSave);
+        updateDbStatus("connected");
+      } catch (_) {
+        updateDbStatus("error");
+        showToast("CSV儲存失敗，請重新連結資料夾", 3600);
+      } finally { state.saving = false; }
+    }
+
+    function updateDbStatus(mode) {
+      const dot = $(".status-dot", elements.dbStatus);
+      const label = $("span:last-child", elements.dbStatus);
+      if (mode === "connected") {
+        dot.style.background = "#45b982";
+        label.textContent = "CSV已連結";
+        elements.drawerDbStatus.textContent = `已連結${DB_NAME}，所有設定將自動寫入。`;
+      } else if (mode === "error") {
+        dot.style.background = "#ec6269";
+        label.textContent = "CSV需要重新連結";
+        elements.drawerDbStatus.textContent = "資料庫權限已失效，請重新選擇資料夾。設定仍暫存在此裝置。";
+      } else {
+        dot.style.background = "#f0a54a";
+        label.textContent = "CSV尚未連結";
+        elements.drawerDbStatus.textContent = "尚未連結資料夾。目前設定會先保存在此裝置。";
+      }
+    }
+
+    function openHandleDatabase() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(HANDLE_DB, 1);
+        request.onupgradeneeded = () => request.result.createObjectStore(HANDLE_STORE);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function storeDirectoryHandle(handle) {
+      try {
+        const db = await openHandleDatabase();
+        const transaction = db.transaction(HANDLE_STORE, "readwrite");
+        transaction.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
+      } catch (_) { /* Reconnection remains available manually. */ }
+    }
+
+    async function restoreDirectoryHandle() {
+      try {
+        const db = await openHandleDatabase();
+        const handle = await new Promise((resolve, reject) => {
+          const request = db.transaction(HANDLE_STORE, "readonly").objectStore(HANDLE_STORE).get(HANDLE_KEY);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        if (!handle) return;
+        if (typeof handle.queryPermission !== "function") return;
+        const permission = await handle.queryPermission({ mode: "readwrite" });
+        if (permission === "granted") await attachDirectory(handle, false);
+      } catch (_) { /* Browser may not persist handles. */ }
+    }
+
+    async function attachDirectory(handle, announce = true) {
+      state.directoryHandle = handle;
+      state.fileHandle = await handle.getFileHandle(DB_NAME, { create: true });
+      const file = await state.fileHandle.getFile();
+      if (file.size > 0) {
+        try {
+          state.config = parseDatabase(await file.text());
+          if (!state.running) {
+            state.remainingMs = state.config.durationMs;
+            state.totalMs = Math.max(state.remainingMs, 1);
+          }
+          applyAllConfig();
+        } catch (error) {
+          showToast(`CSV讀取失敗：${error.message}`, 4200);
+          state.fileHandle = null;
+          updateDbStatus("error");
+          return;
+        }
+      }
+      await saveNow();
+      await storeDirectoryHandle(handle);
+      updateDbStatus("connected");
+      if (announce) showToast("CSV資料庫已連結");
+    }
+
+    async function connectDatabase() {
+      if (!("showDirectoryPicker" in window)) {
+        switchTab("database");
+        setEditing(true);
+        showToast("此瀏覽器不支援資料夾直接寫入，請使用下載CSV備份", 4400);
+        return;
+      }
+      try {
+        const handle = await window.showDirectoryPicker({ id: "countdown-timer", mode: "readwrite" });
+        await attachDirectory(handle, true);
+      } catch (error) {
+        if (error && error.name !== "AbortError") showToast("無法連結資料夾，請確認瀏覽器檔案權限");
+      }
+    }
+
+    function downloadDatabase() {
+      const blob = new Blob([serializeDatabase()], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = DB_NAME;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("CSV備份已下載");
+    }
+
+    async function importDatabase(file) {
+      try {
+        state.config = parseDatabase(await file.text());
+        if (!state.running) {
+          state.remainingMs = state.config.durationMs;
+          state.totalMs = Math.max(state.remainingMs, 1);
+        }
+        applyAllConfig();
+        scheduleSave();
+        showToast("CSV設定已匯入");
+      } catch (error) { showToast(`無法匯入CSV：${error.message}`, 4200); }
+    }
+
+    function applyAllConfig() {
+      state.config = normalizeConfig(state.config);
+      if (!state.running) {
+        const continuousItem = getCurrentContinuousItem();
+        if (continuousItem) {
+          state.remainingMs = continuousItem.durationMs;
+          state.totalMs = Math.max(continuousItem.durationMs, 1);
+          state.previousRemainingMs = continuousItem.durationMs;
+        }
+      }
+      applyAppearance();
+      renderQuickButtons();
+      renderTime();
+      renderEditors();
+      updateRunControls();
+    }
+
+    function registerWebMcpTools() {
+      const context = document.modelContext;
+      if (!context?.registerTool) return;
+      const tools = [
+        {
+          name: "get_countdown_state", title: "取得倒數狀態", description: "讀取目前倒數時間與執行狀態。",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+          annotations: { readOnlyHint: true, untrustedContentHint: false },
+          execute: () => ({ running: state.running, remainingMs: Math.round(state.remainingMs), totalMs: Math.round(state.totalMs) })
+        },
+        {
+          name: "set_countdown_duration", title: "設定倒數時間", description: "在尚未倒數時，以毫秒設定新的倒數時間。",
+          inputSchema: { type: "object", properties: { durationMs: { type: "number", minimum: 0, maximum: 359999999 } }, required: ["durationMs"], additionalProperties: false },
+          annotations: { readOnlyHint: false, untrustedContentHint: false },
+          execute: input => {
+            if (state.running) throw new Error("倒數進行中無法直接覆寫時間");
+            if (!input || !Number.isFinite(input.durationMs)) throw new Error("durationMs必須是有效數字");
+            state.remainingMs = clamp(input.durationMs, 0, 359999999);
+            state.totalMs = Math.max(state.remainingMs, 1);
+            state.config.durationMs = state.remainingMs;
+            renderTime(); scheduleSave();
+            return { remainingMs: Math.round(state.remainingMs) };
+          }
+        },
+        {
+          name: "end_countdown", title: "結束倒數", description: "結束目前倒數並回到本次設定時間。",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+          annotations: { readOnlyHint: false, untrustedContentHint: false },
+          execute: () => { if (state.running) endCountdown(false); return { running: false, remainingMs: Math.round(state.remainingMs) }; }
+        }
+      ];
+      tools.forEach(tool => { try { void Promise.resolve(context.registerTool(tool)).catch(() => {}); } catch (_) { /* Optional browser capability. */ } });
+    }
+
+    function bindAppearanceInputs() {
+      const bindings = [
+        ["fontFamily", "change", value => state.config.typography.family = value],
+        ["fontWeight", "input", value => state.config.typography.weight = Number(value)],
+        ["titleSize", "input", value => state.config.typography.titleSize = Number(value)],
+        ["timeSize", "input", value => state.config.typography.timeSize = Number(value)],
+        ["millisecondScale", "input", value => state.config.typography.millisecondScale = Number(value)],
+        ["millisecondDigits", "change", value => state.config.typography.millisecondDigits = clamp(Number(value) || 3, 1, 3)],
+        ["backgroundColor", "input", value => state.config.colors.background = value],
+        ["panelColor", "input", value => state.config.colors.panel = value],
+        ["titleColor", "input", value => state.config.colors.title = value],
+        ["timeColor", "input", value => state.config.colors.time = value],
+        ["millisecondColor", "input", value => state.config.colors.milliseconds = value],
+        ["accentColor", "input", value => state.config.colors.accent = value],
+        ["primaryTextColor", "input", value => state.config.colors.primaryText = value],
+        ["quickColor", "input", value => state.config.colors.quick = value],
+        ["quickTextColor", "input", value => state.config.colors.quickText = value],
+        ["focusColor", "input", value => state.config.colors.focus = value],
+        ["focusTextColor", "input", value => state.config.colors.focusText = value],
+        ["progressTrackColor", "input", value => state.config.colors.progressTrack = value],
+        ["dangerColor", "input", value => state.config.colors.danger = value],
+        ["panelStyle", "change", value => state.config.panel.style = value],
+        ["panelRadius", "input", value => state.config.panel.radius = Number(value)],
+        ["panelWidth", "input", value => state.config.panel.width = Number(value)],
+        ["panelHeight", "input", value => state.config.panel.height = Number(value)],
+        ["progressHeight", "input", value => state.config.panel.progressHeight = Number(value)],
+        ["quickButtonSize", "input", value => state.config.panel.quickButtonSize = Number(value)],
+        ["actionButtonSize", "input", value => state.config.panel.actionButtonSize = Number(value)],
+        ["buttonRadius", "input", value => state.config.panel.buttonRadius = Number(value)],
+        ["startLabel", "input", value => state.config.labels.start = value],
+        ["endLabel", "input", value => state.config.labels.end = value],
+        ["focusLabel", "input", value => state.config.labels.focus = value],
+        ["timeupTitleSize", "input", value => state.config.timeup.titleSize = clamp(Number(value) || 160, 32, 360)],
+        ["timeupMessageSize", "input", value => state.config.timeup.messageSize = clamp(Number(value) || 28, 14, 120)],
+        ["timeupButtonSize", "input", value => state.config.timeup.buttonSize = clamp(Number(value) || 19, 14, 72)],
+        ["builtinTone", "change", value => state.config.sound.builtinTone = value],
+        ["toneVolume", "input", value => state.config.sound.volume = Number(value)],
+        ["tonePitch", "input", value => state.config.sound.pitch = Number(value)],
+        ["toneDuration", "input", value => state.config.sound.duration = Number(value)],
+        ["endRepeat", "input", value => state.config.sound.endRepeat = clamp(Number(value) || 1, 1, 20)],
+        ["endInterval", "input", value => state.config.sound.endIntervalMs = clamp((Number(value) || .1) * 1000, 100, 10000)],
+        ["endPlaybackRate", "input", value => state.config.sound.endPlaybackRate = clamp(Number(value) || 1, .25, 4)]
+      ];
+      bindings.forEach(([id, eventName, setter]) => {
+        const input = document.getElementById(id);
+        input.addEventListener(eventName, () => { setter(input.value); applyAppearance(); if (id === "millisecondDigits") renderTime(); syncForm(); scheduleSave(); });
+      });
+      $("#autoFullscreen").addEventListener("change", event => { state.config.behavior.autoFullscreen = event.target.checked; renderFeatureList(); scheduleSave(); });
+      $("#autoFocus").addEventListener("change", event => { state.config.behavior.autoFocus = event.target.checked; renderFeatureList(); scheduleSave(); });
+      $("#flashEnabled").addEventListener("change", event => { state.config.behavior.flashEnabled = event.target.checked; renderFeatureList(); scheduleSave(); });
+      $("#showMilliseconds").addEventListener("change", event => { state.config.typography.showMilliseconds = event.target.checked; applyAppearance(); renderTime(); renderFeatureList(); scheduleSave(); });
+      $("#showProgressText").addEventListener("change", event => { state.config.progress.showText = event.target.checked; applyAppearance(); renderFeatureList(); scheduleSave(); });
+      $("#showProgressMarker").addEventListener("change", event => { state.config.progress.showMarker = event.target.checked; applyAppearance(); renderFeatureList(); scheduleSave(); });
+      $("#continuousEnabled").addEventListener("change", event => {
+        state.config.continuous.enabled = event.target.checked;
+        if (!state.running && event.target.checked) {
+          const activeItem = getCurrentContinuousItem();
+          if (activeItem) { state.remainingMs = activeItem.durationMs; state.totalMs = Math.max(activeItem.durationMs, 1); renderTime(); }
+        }
+        applyAppearance(); renderContinuousSchedule(); renderFeatureList(); scheduleSave();
+      });
+      ["endRepeat", "endInterval", "endPlaybackRate"].forEach(id => document.getElementById(id).addEventListener("blur", () => setTimeout(syncForm, 0)));
+      elements.endSoundSelect.addEventListener("change", event => { state.config.sound.endSound = event.target.value; scheduleSave(); });
+      elements.selectedText.addEventListener("input", event => { state.config.title = event.target.value; applyAppearance(); scheduleSave(); });
+      elements.moveX.addEventListener("input", event => updateSelectedPosition("x", event.target.value));
+      elements.moveY.addEventListener("input", event => updateSelectedPosition("y", event.target.value));
+    }
+
+    function bindEvents() {
+      elements.startButton.addEventListener("click", () => { if (!document.body.classList.contains("editing")) startCountdown(false); });
+      elements.timeDisplay.addEventListener("click", () => { if (!document.body.classList.contains("editing")) openTimeEditor(); });
+      elements.timeDisplay.addEventListener("keydown", event => {
+        if (!document.body.classList.contains("editing") && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); openTimeEditor(); }
+      });
+      $("#confirmTimeEditButton").addEventListener("click", applyDirectTime);
+      $("#cancelTimeEditButton").addEventListener("click", closeTimeEditor);
+      elements.timeEditorOverlay.addEventListener("pointerdown", event => { if (event.target === elements.timeEditorOverlay) closeTimeEditor(); });
+      elements.focusButton.addEventListener("click", () => { if (!document.body.classList.contains("editing")) enterFocusMode(); });
+      elements.dismissAlertButton.addEventListener("click", dismissTimeupAlert);
+      elements.settingsButton.addEventListener("click", () => setEditing(!document.body.classList.contains("editing")));
+      elements.closeSettingsButton.addEventListener("click", () => setEditing(false));
+      elements.dbButton.addEventListener("click", connectDatabase);
+      $("#connectDbButton").addEventListener("click", connectDatabase);
+      $("#saveDbButton").addEventListener("click", async () => { await saveNow(); showToast(state.fileHandle ? "CSV已儲存" : "尚未連結CSV，已保存在此裝置"); });
+      $("#downloadDbButton").addEventListener("click", downloadDatabase);
+      $("#importCsvInput").addEventListener("change", event => { if (event.target.files[0]) importDatabase(event.target.files[0]); event.target.value = ""; });
+      $("#soundUpload").addEventListener("change", event => { handleSoundUpload(event.target.files); event.target.value = ""; });
+      $("#previewBuiltinButton").addEventListener("click", () => playSoundChoice(`builtin:${state.config.sound.builtinTone}`, 1, 800, 1, true));
+      $("#previewEndSoundButton").addEventListener("click", () => playSoundChoice(state.config.sound.endSound, state.config.sound.endRepeat, state.config.sound.endIntervalMs, state.config.sound.endPlaybackRate));
+      $("#addReminderButton").addEventListener("click", addReminder);
+      $("#previewTimeupButton").addEventListener("click", () => {
+        if (elements.timeupOverlay.classList.contains("show")) return;
+        state.previewingTimeup = true;
+        elements.timeupTitle.textContent = "時間到";
+        elements.timeupMessage.textContent = "本次倒數已結束（預覽）";
+        elements.timeupOverlay.classList.add("show", "preview");
+      });
+      $("#addQuickButton").addEventListener("click", () => {
+        state.config.quickButtons.push({ id: uniqueId("quick"), label: "+10min", direction: "plus", amount: 10, unit: "minutes", deltaMs: 600000, enabled: true });
+        renderQuickButtons(); renderQuickEditor(); scheduleSave();
+      });
+      $("#addContinuousButton").addEventListener("click", addContinuousItem);
+      $("#resetPositionButton").addEventListener("click", () => { state.config.positions[state.selectedKey] = { x: 0, y: 0 }; applyAppearance(); selectElement(state.selectedKey); scheduleSave(); });
+      $("#contextCloseButton").addEventListener("click", hideContextToolbar);
+      elements.contextFontColor.addEventListener("input", updateContextStyle);
+      elements.contextFontSize.addEventListener("input", updateContextStyle);
+      elements.contextFontFamily.addEventListener("change", updateContextStyle);
+      elements.contextFontWeight.addEventListener("input", updateContextStyle);
+      elements.contextBackgroundColor.addEventListener("input", () => { elements.contextBackgroundTransparent.checked = false; updateContextStyle(); });
+      elements.contextBackgroundTransparent.addEventListener("change", updateContextStyle);
+      elements.contextMoveX.addEventListener("input", updateContextStyle);
+      elements.contextMoveY.addEventListener("input", updateContextStyle);
+      $("#contextJumpButton").addEventListener("click", jumpToSelectedSettings);
+      elements.contextRelatedLinks.addEventListener("click", event => {
+        const button = event.target.closest("[data-context-destination]");
+        if (!button) return;
+        jumpToSettings((contextRelatedTargets[state.selectedKey] || [])[Number(button.dataset.contextDestination)]);
+      });
+      $("#contextResetStyleButton").addEventListener("click", () => {
+        state.config.blockStyles[state.selectedKey] = {};
+        applyBlockStyles(); syncContextToolbar(); scheduleSave(); showToast("已清除個別樣式");
+      });
+      $("#resetButton").addEventListener("click", () => {
+        if (!confirm("確定要恢復所有預設設定？自訂音訊與提醒規則也會移除。")) return;
+        if (state.running) endCountdown(false);
+        stopAllAudio();
+        state.continuousIndex = 0;
+        state.completedContinuousIds.clear();
+        state.audioUrls.forEach(url => URL.revokeObjectURL(url));
+        state.audioUrls.clear();
+        state.config = clone(DEFAULT_CONFIG);
+        state.remainingMs = state.config.durationMs;
+        state.totalMs = state.remainingMs;
+        applyAllConfig(); scheduleSave(); showToast("已恢復預設設定");
+      });
+      $$(".tab-btn").forEach(button => button.addEventListener("click", () => switchTab(button.dataset.tab)));
+      elements.quickRow.addEventListener("click", event => {
+        if (document.body.classList.contains("editing")) return;
+        const button = event.target.closest("[data-quick-id]");
+        if (!button) return;
+        const item = state.config.quickButtons.find(entry => entry.id === button.dataset.quickId);
+        if (item) adjustTime(item.deltaMs);
+      });
+      elements.quickEditorList.addEventListener("input", handleQuickEditorEvent);
+      elements.quickEditorList.addEventListener("change", handleQuickEditorEvent);
+      elements.quickEditorList.addEventListener("click", handleQuickAction);
+      elements.reminderList.addEventListener("input", handleReminderEditorEvent);
+      elements.reminderList.addEventListener("change", handleReminderEditorEvent);
+      elements.reminderList.addEventListener("click", handleReminderAction);
+      elements.customSoundList.addEventListener("click", handleCustomSoundAction);
+      elements.featureList.addEventListener("change", handleFeatureChange);
+      elements.featureList.addEventListener("click", handleFeatureClick);
+      elements.featureList.addEventListener("input", handleFeatureInput);
+      elements.continuousEditorList.addEventListener("input", handleContinuousEditorEvent);
+      elements.continuousEditorList.addEventListener("change", handleContinuousEditorEvent);
+      elements.continuousEditorList.addEventListener("click", handleContinuousAction);
+      elements.continuousSchedule.addEventListener("click", event => {
+        if (document.body.classList.contains("editing")) return;
+        const button = event.target.closest("[data-continuous-index]");
+        if (button) selectContinuousIndex(Number(button.dataset.continuousIndex), false);
+      });
+      document.addEventListener("pointerdown", beginDrag, true);
+      window.addEventListener("pointermove", continueDrag, { passive: false });
+      window.addEventListener("pointerup", endDrag);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") void ensureAudioContext();
+        if (document.visibilityState === "visible" && state.running) { requestWakeLock(); tick(performance.now()); }
+      });
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && elements.timeEditorOverlay.classList.contains("show")) closeTimeEditor();
+        else if (event.key === "Escape" && elements.contextToolbar.classList.contains("show")) hideContextToolbar();
+        if (event.key === "Enter" && elements.timeEditorOverlay.classList.contains("show") && event.target.matches("#directHours,#directMinutes,#directSeconds,#directMilliseconds")) applyDirectTime();
+      });
+      window.addEventListener("beforeunload", saveLocalBackup);
+      const unlockAudio = () => { void ensureAudioContext(); };
+      ["pointerdown", "keydown", "touchstart"].forEach(name => document.addEventListener(name, unlockAudio, { capture: true, passive: true }));
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && elements.timeupOverlay.classList.contains("show")) dismissTimeupAlert();
+      });
+      document.addEventListener("fullscreenchange", () => {
+        if (!document.fullscreenElement) {
+          state.focusFullscreen = false;
+          if (document.body.classList.contains("focus-mode")) exitFocusMode();
+        }
+      });
+      bindAppearanceInputs();
+    }
+
+    function handleQuickEditorEvent(event) {
+      const input = event.target.closest("[data-quick-field]");
+      const card = event.target.closest("[data-id]");
+      if (!input || !card) return;
+      const item = state.config.quickButtons.find(entry => entry.id === card.dataset.id);
+      if (!item) return;
+      const field = input.dataset.quickField;
+      if (field === "label") item.label = input.value;
+      else if (field === "enabled") item.enabled = input.checked;
+      item.direction = $("[data-quick-field='direction']", card).value;
+      item.amount = Math.max(.001, Number($("[data-quick-field='amount']", card).value) || .001);
+      item.unit = $("[data-quick-field='unit']", card).value;
+      item.deltaMs = (item.direction === "minus" ? -1 : 1) * item.amount * unitFactor(item.unit);
+      renderQuickButtons(); renderFeatureList(); scheduleSave();
+    }
+
+    function handleQuickAction(event) {
+      const button = event.target.closest("[data-quick-action]");
+      const card = event.target.closest("[data-id]");
+      if (!button || !card) return;
+      const index = state.config.quickButtons.findIndex(entry => entry.id === card.dataset.id);
+      if (index < 0) return;
+      const action = button.dataset.quickAction;
+      if (action === "remove") state.config.quickButtons.splice(index, 1);
+      if (action === "up" && index > 0) [state.config.quickButtons[index - 1], state.config.quickButtons[index]] = [state.config.quickButtons[index], state.config.quickButtons[index - 1]];
+      if (action === "down" && index < state.config.quickButtons.length - 1) [state.config.quickButtons[index + 1], state.config.quickButtons[index]] = [state.config.quickButtons[index], state.config.quickButtons[index + 1]];
+      renderQuickButtons(); renderQuickEditor(); renderFeatureList(); scheduleSave();
+    }
+
+    function handleReminderEditorEvent(event) {
+      const input = event.target.closest("[data-reminder-field]");
+      const card = event.target.closest("[data-reminder-id]");
+      if (!input || !card) return;
+      const reminder = state.config.reminders.find(item => item.id === card.dataset.reminderId);
+      if (!reminder) return;
+      const field = input.dataset.reminderField;
+      if (field === "enabled") reminder.enabled = input.checked;
+      else if (["hours", "minutes", "seconds", "milliseconds"].includes(field)) {
+        const hours = clamp(Number($("[data-reminder-field='hours']", card).value) || 0, 0, 999);
+        const minutes = clamp(Number($("[data-reminder-field='minutes']", card).value) || 0, 0, 59);
+        const seconds = clamp(Number($("[data-reminder-field='seconds']", card).value) || 0, 0, 59);
+        const milliseconds = clamp(Number($("[data-reminder-field='milliseconds']", card).value) || 0, 0, 999);
+        reminder.timeMs = hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
+      } else if (field === "sound") reminder.sound = input.value;
+      else if (field === "repeat") reminder.repeat = clamp(Number(input.value) || 1, 1, 20);
+      else if (field === "interval") reminder.intervalMs = clamp((Number(input.value) || .1) * 1000, 100, 10000);
+      else if (field === "playbackRate") reminder.playbackRate = clamp(Number(input.value) || 1, .25, 4);
+      renderFeatureList();
+      scheduleSave();
+    }
+
+    function handleReminderAction(event) {
+      const button = event.target.closest("[data-reminder-action]");
+      const card = event.target.closest("[data-reminder-id]");
+      if (!button || !card) return;
+      const reminder = state.config.reminders.find(item => item.id === card.dataset.reminderId);
+      if (!reminder) return;
+      if (button.dataset.reminderAction === "preview") playSoundChoice(reminder.sound, reminder.repeat, reminder.intervalMs, reminder.playbackRate || 1);
+      else {
+        state.config.reminders = state.config.reminders.filter(item => item.id !== reminder.id);
+        renderReminders(); renderFeatureList(); scheduleSave();
+      }
+    }
+
+    function handleCustomSoundAction(event) {
+      const button = event.target.closest("[data-sound-action]");
+      const card = event.target.closest("[data-sound-id]");
+      if (!button || !card) return;
+      if (button.dataset.soundAction === "preview") playSoundChoice(`custom:${card.dataset.soundId}`, 1, 800);
+      else removeCustomSound(card.dataset.soundId);
+    }
+
+    function addContinuousItem() {
+      const number = state.config.continuous.items.length + 1;
+      state.config.continuous.enabled = true;
+      state.config.continuous.items.push({
+        id: uniqueId("continuous"), name: `倒數${number}`, durationMs: 300000, enabled: true,
+        sound: `builtin:${state.config.sound.builtinTone}`, repeat: 1, intervalMs: 800, playbackRate: 1,
+        customRemindersEnabled: false, expanded: false, reminders: []
+      });
+      if (state.config.continuous.items.length === 1) selectContinuousIndex(0, false);
+      renderContinuousEditor(); renderContinuousSchedule(); renderFeatureList(); syncForm(); scheduleSave();
+    }
+
+    function handleFeatureChange(event) {
+      const input = event.target.closest("[data-feature-kind]");
+      if (!input) return;
+      const kind = input.dataset.featureKind;
+      if (kind === "behavior") state.config.behavior[input.dataset.featureKey] = input.checked;
+      else if (kind === "typography") state.config.typography[input.dataset.featureKey] = input.checked;
+      else if (kind === "progress") state.config.progress[input.dataset.featureKey] = input.checked;
+      else if (kind === "continuous") state.config.continuous[input.dataset.featureKey] = input.checked;
+      else if (kind === "quick") {
+        const item = state.config.quickButtons.find(entry => entry.id === input.dataset.featureId);
+        if (item) item.enabled = input.checked;
+      } else if (kind === "reminder") {
+        const item = state.config.reminders.find(entry => entry.id === input.dataset.featureId);
+        if (item) item.enabled = input.checked;
+      } else if (kind === "continuousItem") {
+        const item = state.config.continuous.items.find(entry => entry.id === input.dataset.featureId);
+        if (item) item.enabled = input.checked;
+      } else if (kind === "continuousReminders") {
+        const item = state.config.continuous.items.find(entry => entry.id === input.dataset.featureId);
+        if (item) item.customRemindersEnabled = input.checked;
+      } else if (kind === "continuousReminder") {
+        const item = state.config.continuous.items.find(entry => entry.id === input.dataset.featureParentId);
+        const reminder = item?.reminders.find(entry => entry.id === input.dataset.featureId);
+        if (reminder) reminder.enabled = input.checked;
+      }
+      if (!state.running && (kind === "continuousItem" || (kind === "continuous" && input.dataset.featureKey === "enabled")) && state.config.continuous.enabled) {
+        const activeItem = getCurrentContinuousItem();
+        if (activeItem) { state.remainingMs = activeItem.durationMs; state.totalMs = Math.max(activeItem.durationMs, 1); renderTime(); }
+      }
+      applyAppearance(); renderQuickButtons(); renderQuickEditor(); renderReminders(); renderContinuousEditor(); renderContinuousSchedule(); syncForm(); renderFeatureList(); scheduleSave();
+    }
+
+    function handleFeatureInput(event) {
+      if (event.target.id !== "autoDismissSeconds") return;
+      state.config.continuous.autoDismissSeconds = clamp(Number(event.target.value) || .5, .5, 300);
+      scheduleSave();
+    }
+
+    function handleFeatureClick(event) {
+      const button = event.target.closest("[data-feature-go]");
+      if (!button) return;
+      if (button.dataset.featureGo === "continuous" && button.dataset.featureTarget.startsWith("continuous-")) {
+        const id = button.dataset.featureTarget.slice(11);
+        const item = state.config.continuous.items.find(entry => entry.id === id);
+        if (item) { item.expanded = true; renderContinuousEditor(); }
+      }
+      jumpToSettings({ tab: button.dataset.featureGo, target: button.dataset.featureTarget });
+    }
+
+    function continuousReminderFromEvent(event, item) {
+      const card = event.target.closest("[data-continuous-reminder-id]");
+      return card ? item.reminders.find(reminder => reminder.id === card.dataset.continuousReminderId) : null;
+    }
+
+    function handleContinuousEditorEvent(event) {
+      const card = event.target.closest("[data-continuous-id]");
+      if (!card) return;
+      const item = state.config.continuous.items.find(entry => entry.id === card.dataset.continuousId);
+      if (!item) return;
+      const reminderInput = event.target.closest("[data-continuous-reminder-field]");
+      if (reminderInput) {
+        const reminder = continuousReminderFromEvent(event, item);
+        if (!reminder) return;
+        const field = reminderInput.dataset.continuousReminderField;
+        if (field === "enabled") reminder.enabled = reminderInput.checked;
+        else if (["hours", "minutes", "seconds", "milliseconds"].includes(field)) {
+          const reminderCard = reminderInput.closest("[data-continuous-reminder-id]");
+          const hours = clamp(Number($("[data-continuous-reminder-field='hours']", reminderCard).value) || 0, 0, 999);
+          const minutes = clamp(Number($("[data-continuous-reminder-field='minutes']", reminderCard).value) || 0, 0, 59);
+          const seconds = clamp(Number($("[data-continuous-reminder-field='seconds']", reminderCard).value) || 0, 0, 59);
+          const milliseconds = clamp(Number($("[data-continuous-reminder-field='milliseconds']", reminderCard).value) || 0, 0, 999);
+          reminder.timeMs = hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
+        } else if (field === "sound") reminder.sound = reminderInput.value;
+        else if (field === "repeat") reminder.repeat = clamp(Number(reminderInput.value) || 1, 1, 20);
+        else if (field === "interval") reminder.intervalMs = clamp((Number(reminderInput.value) || .1) * 1000, 100, 10000);
+        else if (field === "playbackRate") reminder.playbackRate = clamp(Number(reminderInput.value) || 1, .25, 4);
+        renderFeatureList();
+        scheduleSave();
+        return;
+      }
+      const input = event.target.closest("[data-continuous-field]");
+      if (!input) return;
+      const field = input.dataset.continuousField;
+      if (field === "enabled" || field === "customRemindersEnabled") item[field] = input.checked;
+      else if (field === "name") item.name = input.value;
+      else if (["hours", "minutes", "seconds", "milliseconds"].includes(field)) {
+        const hours = clamp(Number($("[data-continuous-field='hours']", card).value) || 0, 0, 999);
+        const minutes = clamp(Number($("[data-continuous-field='minutes']", card).value) || 0, 0, 59);
+        const seconds = clamp(Number($("[data-continuous-field='seconds']", card).value) || 0, 0, 59);
+        const milliseconds = clamp(Number($("[data-continuous-field='milliseconds']", card).value) || 0, 0, 999);
+        item.durationMs = hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds;
+        if (state.continuousIndex === state.config.continuous.items.indexOf(item) && !state.running) {
+          state.remainingMs = item.durationMs; state.totalMs = Math.max(item.durationMs, 1); renderTime();
+        }
+      } else if (field === "sound") item.sound = input.value;
+      else if (field === "repeat") item.repeat = clamp(Number(input.value) || 1, 1, 20);
+      else if (field === "interval") item.intervalMs = clamp((Number(input.value) || .1) * 1000, 100, 10000);
+      else if (field === "playbackRate") item.playbackRate = clamp(Number(input.value) || 1, .25, 4);
+      if (field === "enabled" && !state.running) {
+        const activeItem = getCurrentContinuousItem();
+        if (activeItem) { state.remainingMs = activeItem.durationMs; state.totalMs = Math.max(activeItem.durationMs, 1); renderTime(); }
+      }
+      applyAppearance(); renderContinuousSchedule(); renderFeatureList(); scheduleSave();
+    }
+
+    function handleContinuousAction(event) {
+      const card = event.target.closest("[data-continuous-id]");
+      if (!card) return;
+      const index = state.config.continuous.items.findIndex(entry => entry.id === card.dataset.continuousId);
+      if (index < 0) return;
+      const item = state.config.continuous.items[index];
+      const reminderButton = event.target.closest("[data-continuous-reminder-action]");
+      if (reminderButton) {
+        const reminder = continuousReminderFromEvent(event, item);
+        if (!reminder) return;
+        if (reminderButton.dataset.continuousReminderAction === "preview") playSoundChoice(reminder.sound, reminder.repeat, reminder.intervalMs, reminder.playbackRate || 1);
+        else { item.reminders = item.reminders.filter(entry => entry.id !== reminder.id); renderContinuousEditor(); scheduleSave(); }
+        return;
+      }
+      const button = event.target.closest("[data-continuous-action]");
+      if (!button) return;
+      const action = button.dataset.continuousAction;
+      if (action === "preview") playSoundChoice(item.sound, item.repeat, item.intervalMs, item.playbackRate);
+      else if (action === "select") selectContinuousIndex(index, false);
+      else if (action === "toggleReminders") { item.expanded = !item.expanded; renderContinuousEditor(); }
+      else if (action === "addReminder") {
+        item.expanded = true;
+        item.customRemindersEnabled = true;
+        item.reminders.push({ id: uniqueId("continuous-reminder"), timeMs: 60000, sound: `builtin:${state.config.sound.builtinTone}`, repeat: 1, intervalMs: 800, playbackRate: 1, enabled: true });
+        renderContinuousEditor();
+      } else {
+        const selectedId = state.config.continuous.items[state.continuousIndex]?.id;
+        if (action === "remove" && state.running && item.id === selectedId) {
+          endCountdown(false);
+          showToast("已刪除進行中的倒數，倒數已停止");
+        }
+        if (action === "remove") state.config.continuous.items.splice(index, 1);
+        if (action === "up" && index > 0) [state.config.continuous.items[index - 1], state.config.continuous.items[index]] = [state.config.continuous.items[index], state.config.continuous.items[index - 1]];
+        if (action === "down" && index < state.config.continuous.items.length - 1) [state.config.continuous.items[index + 1], state.config.continuous.items[index]] = [state.config.continuous.items[index], state.config.continuous.items[index + 1]];
+        const selectedIndex = state.config.continuous.items.findIndex(entry => entry.id === selectedId);
+        state.continuousIndex = selectedIndex >= 0 ? selectedIndex : Math.max(0, Math.min(index, state.config.continuous.items.length - 1));
+        if (!state.running) {
+          const nextSelected = getCurrentContinuousItem();
+          if (nextSelected) { state.remainingMs = nextSelected.durationMs; state.totalMs = Math.max(nextSelected.durationMs, 1); renderTime(); }
+        }
+        renderContinuousEditor(); renderContinuousSchedule(); renderFeatureList(); applyAppearance();
+      }
+      scheduleSave();
+    }
+
+    function beginDrag(event) {
+      if (!document.body.classList.contains("editing") || event.target.closest(".settings-drawer,.context-toolbar")) return;
+      const target = event.target.closest("[data-edit-key]");
+      if (!target) { hideContextToolbar(); return; }
+      event.preventDefault(); event.stopPropagation();
+      const key = target.dataset.editKey;
+      showContextToolbar(key, event.clientX, event.clientY);
+      const quickButton = event.target.closest("[data-quick-id]");
+      if (quickButton) {
+        state.quickDrag = { id: quickButton.dataset.quickId, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY, moved: false };
+        try { quickButton.setPointerCapture(event.pointerId); } catch (_) { /* Pointer capture is optional. */ }
+        return;
+      }
+      const position = state.config.positions[key];
+      state.drag = { key, startX: event.clientX, startY: event.clientY, originX: position.x, originY: position.y, moved: false };
+      document.body.classList.add("no-transition");
+    }
+
+    function continueDrag(event) {
+      if (state.quickDrag) {
+        event.preventDefault();
+        const drag = state.quickDrag;
+        drag.lastX = event.clientX;
+        drag.lastY = event.clientY;
+        if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 6) return;
+        if (!drag.moved) { drag.moved = true; hideContextToolbar(); renderQuickButtons(); }
+        const overButton = document.elementFromPoint(event.clientX, event.clientY)?.closest?.("[data-quick-id]");
+        if (!overButton || overButton.dataset.quickId === drag.id) return;
+        const fromIndex = state.config.quickButtons.findIndex(item => item.id === drag.id);
+        const toIndex = state.config.quickButtons.findIndex(item => item.id === overButton.dataset.quickId);
+        if (fromIndex < 0 || toIndex < 0) return;
+        [state.config.quickButtons[fromIndex], state.config.quickButtons[toIndex]] = [state.config.quickButtons[toIndex], state.config.quickButtons[fromIndex]];
+        renderQuickButtons();
+        return;
+      }
+      if (!state.drag) return;
+      event.preventDefault();
+      if (!state.drag.moved && Math.hypot(event.clientX - state.drag.startX, event.clientY - state.drag.startY) >= 4) {
+        state.drag.moved = true;
+        hideContextToolbar();
+      }
+      const position = state.config.positions[state.drag.key];
+      position.x = clamp(Math.round(state.drag.originX + event.clientX - state.drag.startX), -400, 400);
+      position.y = clamp(Math.round(state.drag.originY + event.clientY - state.drag.startY), -300, 300);
+      const target = document.querySelector(`[data-edit-key="${state.drag.key}"]`);
+      target.style.setProperty("--move-x", `${position.x}px`);
+      target.style.setProperty("--move-y", `${position.y}px`);
+      if (state.selectedKey === state.drag.key) selectElement(state.drag.key);
+    }
+
+    function endDrag() {
+      if (state.quickDrag) {
+        const moved = state.quickDrag.moved;
+        state.quickDrag = null;
+        renderQuickButtons();
+        if (moved) {
+          renderQuickEditor(); renderFeatureList(); scheduleSave();
+          showToast("快捷按鈕順序已更新");
+        }
+        return;
+      }
+      if (!state.drag) return;
+      state.drag = null;
+      document.body.classList.remove("no-transition");
+      scheduleSave();
+    }
+
+    function initialize() {
+      loadLocalBackup();
+      state.remainingMs = Number(state.config.durationMs) || 0;
+      state.totalMs = Math.max(state.remainingMs, 1);
+      applyAllConfig();
+      bindEvents();
+      updateDbStatus("local");
+      restoreDirectoryHandle();
+      registerWebMcpTools();
+      setInterval(() => { if (state.running && document.hidden) tick(performance.now()); }, 500);
+    }
+
+    initialize();
+  })();
+  </script>
+</body>
+</html>
