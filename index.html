@@ -152,6 +152,12 @@
     .storage-option small{display:block;margin-top:3px;font-size:.78rem;line-height:1.45;color:var(--muted)}
     .storage-option:has(input:checked){border-color:var(--accent);background:#f3f7ff;box-shadow:0 0 0 3px rgba(79,125,243,.1)}
     .storage-option.disabled{opacity:.55;cursor:not-allowed}
+    .source-banner{display:grid;gap:6px;padding:14px;margin-bottom:15px;border-radius:16px;background:linear-gradient(135deg,#eef4ff,#f7faff);border:1px solid #d6e2f7}
+    .source-banner .source-label{font-size:.76rem;font-weight:850;color:#6e7b92;letter-spacing:.04em}
+    .source-banner .source-mode{display:flex;align-items:center;gap:8px;font-weight:900;color:#1f3b7a}
+    .source-banner .source-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+    .source-banner code{display:block;padding:8px 10px;border-radius:10px;background:#fff;border:1px solid #dfe7f2;color:#33405a;font-size:.8rem;line-height:1.5;word-break:break-all;white-space:pre-wrap;font-family:Consolas,"SFMono-Regular",monospace}
+    .source-banner small{color:#6e7b92;font-size:.76rem;line-height:1.5}
     @media (hover:hover) and (pointer:fine){.storage-option:not(.disabled):hover{border-color:color-mix(in srgb,var(--accent) 55%,#dfe7f2);box-shadow:0 5px 14px rgba(49,95,207,.12)}}
     .full-btn{width:100%;border:0;border-radius:12px;padding:13px 15px;background:var(--accent);color:#fff;font-weight:800;cursor:pointer}
     .full-btn.secondary{background:#edf3ff;color:#315fcf}
@@ -441,14 +447,21 @@
         </section>
 
         <section class="tab-panel" data-panel="database">
+          <div class="source-banner" id="dataSourceBanner" aria-live="polite"></div>
           <div class="section db-card">
             <h3>資料儲存位置</h3>
             <div class="storage-mode" role="radiogroup" aria-label="資料儲存位置">
+              <label class="storage-option" id="storageOptionGithub"><input type="radio" name="storageMode" value="github"><span><strong>GitHub CSV（預設）</strong><small>讀取與網站一起放在 GitHub 的CSV，所有裝置打開都一樣。網站無法寫回，修改後需下載CSV再上傳到 GitHub。</small></span></label>
+              <label class="storage-option" id="storageOptionLocal"><input type="radio" name="storageMode" value="local"><span><strong>本機CSV資料夾</strong><small id="localModeNote">直接讀寫電腦上的資料夾，需使用電腦版 Chrome／Edge。</small></span></label>
               <label class="storage-option" id="storageOptionCloud"><input type="radio" name="storageMode" value="cloud"><span><strong>雲端CSV（Google 雲端硬碟）</strong><small>透過 Apps Script 讀寫，多台裝置共用同一份，手機也能用。</small></span></label>
-              <label class="storage-option" id="storageOptionLocal"><input type="radio" name="storageMode" value="local"><span><strong>本機CSV資料夾</strong><small id="localModeNote">直接寫入電腦上的資料夾，需使用電腦版 Chrome／Edge。</small></span></label>
             </div>
             <div class="db-state" id="drawerDbStatus">尚未設定資料庫。目前設定會先保存在此裝置。</div>
-            <div class="db-card" id="cloudFields">
+            <div class="db-card" id="githubFields">
+              <div class="field" style="margin:0"><label for="githubPath">GitHub CSV 位置（相對於網站，或完整網址）</label><input id="githubPath" type="text" autocomplete="off" spellcheck="false" placeholder="倒數計時器-資料庫.csv"></div>
+              <button class="full-btn" id="loadGithubButton" type="button">重新讀取 GitHub CSV</button>
+              <button class="full-btn secondary" id="openGithubUploadButton" type="button">下載CSV並前往 GitHub 上傳</button>
+            </div>
+            <div class="db-card hidden" id="cloudFields">
               <div class="field" style="margin:0"><label for="cloudUrl">Apps Script 網址（/exec 結尾）</label><input id="cloudUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></div>
               <div class="field" style="margin:0"><label for="cloudKey">連線密碼</label><input id="cloudKey" type="password" autocomplete="off"></div>
               <button class="full-btn" id="connectDbButton" type="button">儲存並連線雲端</button>
@@ -456,6 +469,8 @@
             </div>
             <div class="db-card hidden" id="localFields">
               <button class="full-btn" id="connectLocalButton" type="button">連結本機資料夾</button>
+              <div class="field" style="margin:0"><label for="localPathNote">此資料夾的完整路徑（選填，僅用於顯示）</label><input id="localPathNote" type="text" autocomplete="off" spellcheck="false" placeholder="例如 C:\Users\user\Desktop\CA\其他\14.倒數計時器"></div>
+              <p class="section-note" style="margin:0">瀏覽器基於隱私，只會告訴網頁資料夾名稱，不提供完整路徑；填寫後會顯示在上方的「目前資料讀取位置」。</p>
             </div>
             <button class="full-btn secondary" id="saveDbButton" type="button">立即儲存</button>
             <button class="full-btn secondary" id="downloadDbButton" type="button">下載CSV備份</button>
@@ -464,6 +479,7 @@
           <div class="section">
             <h3>資料說明</h3>
             <p class="section-note">兩種模式使用相同的CSV格式，可用「下載CSV備份／匯入CSV備份」互相搬移。</p>
+            <p class="section-note"><b>GitHub CSV：</b>讀取和網站放在同一個 GitHub 儲存庫的「倒數計時器-資料庫.csv」。網站無法直接寫回 GitHub，在此修改的設定只會先存在這台裝置；要讓所有裝置套用，請按「下載CSV並前往 GitHub 上傳」，用下載的檔案覆蓋儲存庫中的CSV。GitHub 更新後約 1～2 分鐘生效。注意：公開儲存庫中的CSV任何人都能下載。</p>
             <p class="section-note"><b>雲端CSV：</b>讀寫你 Google 雲端硬碟「倒數計時器-資料」資料夾中的「倒數計時器-資料庫.csv」。網址與密碼只保存在這台裝置。</p>
             <p class="section-note"><b>本機CSV：</b>選擇一個資料夾，系統會讀寫其中的「倒數計時器-資料庫.csv」，找不到時會自動建立。瀏覽器重新開啟後，可能需要再按一次「連結本機資料夾」授權。</p>
             <p class="section-note" style="margin-bottom:0">切換模式或第一次連線時，若目的地已有資料，會改用目的地的資料；若目的地是空的，會寫入目前的設定。</p>
@@ -682,7 +698,14 @@
       directoryHandle: null,
       fileHandle: null,
       savedDirectoryHandle: null,
-      storageMode: "cloud",
+      storageMode: "github",
+      githubPath: "",
+      githubLoaded: false,
+      githubLoading: false,
+      githubText: "",
+      githubSignature: "",
+      githubCheckedAt: 0,
+      localPathNote: "",
       cloud: { url: "", key: "" },
       cloudReady: false,
       cloudLoading: false,
@@ -2029,7 +2052,7 @@
       if (!selected.length) return;
       await ensureAudioContext();
       for (const file of selected) {
-        const sizeLimit = isLocalMode() ? 15 : 8;
+        const sizeLimit = isCloudMode() ? 8 : 15;
         if (file.size > sizeLimit * 1024 * 1024) {
           showToast(`${file.name}超過${sizeLimit}MB，已略過`, 3600);
           continue;
@@ -2043,7 +2066,7 @@
           };
           state.config.customSounds.push(sound);
           renderCustomSounds();
-          if (!isLocalMode() && state.cloudReady) { showToast(`正在上傳${file.name}到雲端…`, 8000); await uploadSoundToCloud(sound); }
+          if (isCloudMode() && state.cloudReady) { showToast(`正在上傳${file.name}到雲端…`, 8000); await uploadSoundToCloud(sound); }
         } catch (_) {
           showToast(`${file.name}讀取失敗`);
         }
@@ -2052,7 +2075,9 @@
       renderSoundSelectors();
       renderContinuousEditor();
       scheduleSave();
-      if (isLocalMode()) {
+      if (isGithubMode()) {
+        showToast("音訊已加入此裝置；請下載CSV並上傳到 GitHub 才會永久保存", 5200);
+      } else if (isLocalMode()) {
         if (!state.fileHandle) showToast("音訊已加入，請連結本機資料夾或下載CSV備份以永久保存", 4200);
         else showToast("自訂音訊已加入並儲存到本機CSV");
       } else if (!state.cloudReady) showToast("音訊已加入，但尚未連線雲端；重新整理後會消失，請先下載CSV備份", 5200);
@@ -2063,7 +2088,7 @@
       const sound = state.config.customSounds.find(item => item.id === id);
       if (!sound) return;
       state.config.customSounds = state.config.customSounds.filter(item => item.id !== id);
-      if (!isLocalMode() && state.cloudReady) cloudCall("deleteSound", { id }).then(acceptRev).catch(error => showToast(`雲端刪除音訊失敗：${error.message}`, 3600));
+      if (isCloudMode() && state.cloudReady) cloudCall("deleteSound", { id }).then(acceptRev).catch(error => showToast(`雲端刪除音訊失敗：${error.message}`, 3600));
       const url = state.audioUrls.get(id);
       if (url) URL.revokeObjectURL(url);
       state.audioUrls.delete(id);
@@ -2153,25 +2178,39 @@
 
     const STORAGE_SETTINGS_KEY = "countdownTimerCloudSettings";
     const CLOUD_DIRTY_KEY = "countdownTimerCloudDirty";
+    const GITHUB_DIRTY_KEY = "countdownTimerGithubDirty";
     const localFolderSupported = "showDirectoryPicker" in window;
     const isLocalMode = () => state.storageMode === "local";
+    const isGithubMode = () => state.storageMode === "github";
+    const isCloudMode = () => state.storageMode === "cloud";
+    const STORAGE_MODES = ["github", "local", "cloud"];
 
     function readStorageSettings() {
       try {
         const value = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || "{}");
-        return { mode: value.mode, url: String(value.url || ""), key: String(value.key || ""), rev: value.rev ?? null };
-      } catch (_) { return { mode: undefined, url: "", key: "", rev: null }; }
+        return { mode: value.mode, url: String(value.url || ""), key: String(value.key || ""), rev: value.rev ?? null, githubPath: String(value.githubPath || ""), localPathNote: String(value.localPathNote || "") };
+      } catch (_) { return { mode: undefined, url: "", key: "", rev: null, githubPath: "", localPathNote: "" }; }
     }
 
     function writeStorageSettings() {
       try {
-        localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify({ mode: state.storageMode, url: state.cloud.url, key: state.cloud.key, rev: state.cloudRev }));
+        localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify({ mode: state.storageMode, url: state.cloud.url, key: state.cloud.key, rev: state.cloudRev, githubPath: state.githubPath, localPathNote: state.localPathNote }));
       } catch (_) { /* Optional. */ }
     }
 
     function setDirty(value) {
       try { if (value) localStorage.setItem(CLOUD_DIRTY_KEY, "1"); else localStorage.removeItem(CLOUD_DIRTY_KEY); } catch (_) { /* Optional. */ }
     }
+
+    function setGithubDirty(value) {
+      try { if (value) localStorage.setItem(GITHUB_DIRTY_KEY, "1"); else localStorage.removeItem(GITHUB_DIRTY_KEY); } catch (_) { /* Optional. */ }
+    }
+
+    function isGithubDirtyStored() {
+      try { return localStorage.getItem(GITHUB_DIRTY_KEY) === "1"; } catch (_) { return false; }
+    }
+
+    const dataSignature = () => `${configPayload()}|${state.config.customSounds.map(sound => sound.id).join(",")}`;
 
     function isDirtyStored() {
       try { return localStorage.getItem(CLOUD_DIRTY_KEY) === "1"; } catch (_) { return false; }
@@ -2212,56 +2251,111 @@
         fsSaving: ["#4f7df3", "本機CSV儲存中", "正在寫入本機CSV…"],
         fsError: ["#ec6269", "本機CSV需重新連結", "資料夾權限已失效，請按「連結本機資料夾」重新授權。設定暫存在此裝置。"],
         fsNone: ["#f0a54a", "本機CSV尚未連結", "尚未連結資料夾。請按「連結本機資料夾」選擇放CSV的資料夾；在那之前設定只保存在此裝置。"],
-        fsUnsupported: ["#f0a54a", "僅存在此裝置", "此瀏覽器不支援直接寫入本機資料夾（需電腦版 Chrome／Edge）。請改用雲端模式，或用下載／匯入CSV備份。"]
+        fsUnsupported: ["#f0a54a", "僅存在此裝置", "此瀏覽器不支援直接寫入本機資料夾（需電腦版 Chrome／Edge）。請改用 GitHub 或雲端模式，或用下載／匯入CSV備份。"],
+        ghLoading: ["#4f7df3", "讀取GitHub中", "正在讀取 GitHub 上的CSV…"],
+        ghLoaded: ["#45b982", "GitHub CSV", "已載入 GitHub 上的CSV。這個模式是唯讀的：修改只會存在這台裝置，要套用到所有裝置請下載CSV並上傳到 GitHub。"],
+        ghDirty: ["#f0a54a", "GitHub CSV（有未上傳修改）", "這台裝置有尚未上傳到 GitHub 的修改。請按「下載CSV並前往 GitHub 上傳」，用下載的檔案覆蓋儲存庫中的CSV。"],
+        ghError: ["#ec6269", "GitHub CSV讀取失敗", "無法讀取 GitHub 上的CSV，目前使用此裝置暫存的設定。請確認CSV已上傳到儲存庫，且檔名與位置正確。"]
       };
       const [color, text, detail] = modes[mode] || modes.local;
       dot.style.background = color;
       label.textContent = text;
       elements.drawerDbStatus.textContent = detail;
+      renderSourceBanner(color);
+    }
+
+    function githubCsvUrl() {
+      const path = (state.githubPath || DB_NAME).trim() || DB_NAME;
+      try { return new URL(path, location.href).href; } catch (_) { return path; }
+    }
+
+    function githubUploadUrl() {
+      const host = location.hostname;
+      if (!host.endsWith(".github.io")) return "";
+      const user = host.slice(0, -".github.io".length);
+      const firstSegment = location.pathname.split("/").filter(Boolean)[0];
+      const repo = firstSegment && !/\.html?$/i.test(firstSegment) ? firstSegment : host;
+      return `https://github.com/${user}/${repo}/upload/main`;
+    }
+
+    function renderSourceBanner(color = "#f0a54a") {
+      const banner = document.getElementById("dataSourceBanner");
+      if (!banner) return;
+      let mode = "";
+      let place = "";
+      let note = "";
+      if (isGithubMode()) {
+        mode = "GitHub CSV";
+        try { place = decodeURI(githubCsvUrl()); } catch (_) { place = githubCsvUrl(); }
+        note = state.githubLoaded ? "唯讀；修改需下載後上傳到 GitHub。" : "尚未成功讀取，暫時使用此裝置的暫存設定。";
+      } else if (isLocalMode()) {
+        mode = "本機CSV資料夾";
+        if (state.fileHandle) {
+          const folder = state.directoryHandle?.name || "（資料夾）";
+          const base = state.localPathNote.trim().replace(/[\\/]+$/, "");
+          const separator = base.includes("/") && !base.includes("\\") ? "/" : "\\";
+          place = base ? `${base}${separator}${DB_NAME}` : `…${separator}${folder}${separator}${DB_NAME}`;
+          note = base ? `資料夾名稱：${folder}` : `瀏覽器只提供資料夾名稱「${folder}」。可在下方填寫完整路徑，這裡就會顯示完整位置。`;
+        } else {
+          place = "尚未連結資料夾（目前使用此裝置的瀏覽器暫存）";
+        }
+      } else {
+        mode = "雲端CSV（Google 雲端硬碟）";
+        place = `我的雲端硬碟/倒數計時器-資料/${DB_NAME}`;
+        note = cloudConfigured() ? `經由 ${state.cloud.url.replace(/(\/macros\/s\/.{6}).+(\/(exec|dev))$/, "$1…$2")}` : "尚未設定 Apps Script 網址與密碼（目前使用此裝置的瀏覽器暫存）。";
+      }
+      banner.innerHTML = `<div class="source-label">目前資料讀取位置</div><div class="source-mode"><span class="source-dot" style="background:${color}"></span>${escapeHtml(mode)}</div><code>${escapeHtml(place)}</code>${note ? `<small>${escapeHtml(note)}</small>` : ""}`;
     }
 
     function scheduleSave() {
       saveLocalBackup();
-      if (!isLocalMode() && cloudConfigured() && configPayload() !== state.lastSavedPayload) setDirty(true);
+      if (isCloudMode() && cloudConfigured() && configPayload() !== state.lastSavedPayload) setDirty(true);
       clearTimeout(state.saveTimer);
-      state.saveTimer = setTimeout(saveNow, isLocalMode() ? 550 : 1000);
+      state.saveTimer = setTimeout(saveNow, isCloudMode() ? 1000 : 550);
     }
 
     async function saveNow() {
       clearTimeout(state.saveTimer);
       saveLocalBackup();
       if (isLocalMode()) return localSaveNow();
+      if (isGithubMode()) return githubSaveNow();
       return cloudSaveNow();
     }
 
     function renderStorageMode() {
       $$('input[name="storageMode"]').forEach(input => { input.checked = input.value === state.storageMode; });
-      $("#cloudFields").classList.toggle("hidden", isLocalMode());
+      $("#githubFields").classList.toggle("hidden", !isGithubMode());
+      $("#cloudFields").classList.toggle("hidden", !isCloudMode());
       $("#localFields").classList.toggle("hidden", !isLocalMode());
       $("#storageOptionLocal").classList.toggle("disabled", !localFolderSupported);
       $('input[name="storageMode"][value="local"]').disabled = !localFolderSupported;
       if (!localFolderSupported) $("#localModeNote").textContent = "此瀏覽器不支援（需電腦版 Chrome／Edge）。";
       elements.dbButton.textContent = isLocalMode() ? "↗" : "⟳";
-      elements.dbButton.title = isLocalMode() ? "連結本機CSV資料夾" : "重新從雲端載入";
+      elements.dbButton.title = isLocalMode() ? "連結本機CSV資料夾" : isGithubMode() ? "重新讀取 GitHub CSV" : "重新從雲端載入";
+      $("#openGithubUploadButton").textContent = githubUploadUrl() ? "下載CSV並前往 GitHub 上傳" : "下載CSV（再手動上傳到 GitHub）";
+      renderSourceBanner();
       elements.dbButton.setAttribute("aria-label", elements.dbButton.title);
     }
 
     async function setStorageMode(mode, announce = true) {
       if (mode === "local" && !localFolderSupported) { renderStorageMode(); return; }
       if (mode === state.storageMode) return;
-      if (state.saving || state.cloudLoading) {
+      if (state.saving || state.cloudLoading || state.githubLoading) {
         showToast("正在同步資料，請稍後再切換");
         renderStorageMode();
         return;
       }
-      if (configPayload() !== state.lastSavedPayload || isLocalMode()) await saveNow();
+      if (isLocalMode() || (isCloudMode() && configPayload() !== state.lastSavedPayload)) await saveNow();
       state.storageMode = mode;
       state.cloudReady = false;
+      state.githubLoaded = false;
       state.fileHandle = null;
       state.directoryHandle = null;
       writeStorageSettings();
       renderStorageMode();
-      if (mode === "local") {
+      if (mode === "github") {
+        await loadFromGithub(announce);
+      } else if (mode === "local") {
         updateDbStatus("fsNone");
         await restoreDirectoryHandle();
         if (announce) showToast(state.fileHandle ? "已切換為本機CSV" : "已切換為本機CSV，請按「連結本機資料夾」");
@@ -2414,13 +2508,13 @@
     }
 
     async function uploadSoundToCloud(sound) {
-      if (isLocalMode() || !state.cloudReady) return false;
+      if (!isCloudMode() || !state.cloudReady) return false;
       try { acceptRev(await cloudCall("saveSound", { sound: JSON.stringify(sound) })); return true; }
       catch (error) { showToast(`${sound.name}上傳雲端失敗：${error.message}`, 4200); return false; }
     }
 
     async function syncAllToCloud() {
-      if (isLocalMode() || !state.cloudReady) return false;
+      if (!isCloudMode() || !state.cloudReady) return false;
       try {
         updateDbStatus("saving");
         const payload = configPayload();
@@ -2437,7 +2531,7 @@
     }
 
     async function loadFromCloud(announce = false) {
-      if (isLocalMode()) return;
+      if (!isCloudMode()) return;
       if (!cloudConfigured()) { state.cloudReady = false; updateDbStatus("local"); return; }
       if (state.cloudLoading) return;
       if (state.cloudReady && configPayload() !== state.lastSavedPayload) await saveNow();
@@ -2451,7 +2545,7 @@
           if (keepLocal) acceptRev(await cloudCall("saveConfig", { config: configPayload() }));
         }
         const result = await cloudCall("load");
-        if (isLocalMode()) return;
+        if (!isCloudMode()) return;
         state.cloudReady = true;
         if (result.csv && result.csv.trim()) {
           applyLoadedCsv(result.csv);
@@ -2472,15 +2566,94 @@
 
     // 回到此分頁時，若其他裝置改過雲端資料，就自動載入最新版本。
     async function checkCloudUpdate() {
-      if (isLocalMode() || !state.cloudReady || state.cloudLoading || state.saving || state.running) return;
+      if (!isCloudMode() || !state.cloudReady || state.cloudLoading || state.saving || state.running) return;
       if (configPayload() !== state.lastSavedPayload) { void saveNow(); return; }
       try {
         const info = await cloudCall("info");
-        if (!isLocalMode() && String(info.rev) !== String(state.cloudRev)) {
+        if (isCloudMode() && String(info.rev) !== String(state.cloudRev)) {
           await loadFromCloud(false);
           showToast("已載入其他裝置的最新設定");
         }
       } catch (_) { /* 下次再檢查 */ }
+    }
+
+    /* ---------- GitHub CSV（唯讀） ---------- */
+    async function fetchGithubCsv() {
+      const url = githubCsvUrl();
+      let response;
+      try {
+        response = await fetch(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`, { cache: "no-store" });
+      } catch (_) {
+        throw new Error(location.protocol === "file:" ? "直接用檔案開啟網頁時無法讀取 GitHub CSV，請改用 GitHub Pages 網址" : "無法連線到 GitHub，請確認網路");
+      }
+      if (response.status === 404) throw new Error(`GitHub 上找不到「${decodeURIComponent(url.split("/").pop() || DB_NAME)}」，請確認已上傳到儲存庫`);
+      if (!response.ok) throw new Error(`讀取失敗（HTTP ${response.status}）`);
+      const text = await response.text();
+      if (/^\s*</.test(text)) throw new Error("讀到的不是CSV檔，請確認CSV位置");
+      return text;
+    }
+
+    function githubSaveNow() {
+      const dirty = state.githubLoaded ? dataSignature() !== state.githubSignature : isGithubDirtyStored();
+      if (state.githubLoaded) setGithubDirty(dirty);
+      updateDbStatus(!state.githubLoaded ? "ghError" : dirty ? "ghDirty" : "ghLoaded");
+    }
+
+    async function loadFromGithub(announce = false) {
+      if (!isGithubMode() || state.githubLoading) return;
+      state.githubLoading = true;
+      updateDbStatus("ghLoading");
+      try {
+        const csv = await fetchGithubCsv();
+        if (!isGithubMode()) return;
+        const remote = parseDatabase(csv);
+        const remotePayload = (() => { const copy = clone(remote); delete copy.customSounds; return JSON.stringify(copy); })();
+        const remoteSignature = `${remotePayload}|${remote.customSounds.map(sound => sound.id).join(",")}`;
+        let keepLocal = false;
+        if (isGithubDirtyStored() && configPayload() !== remotePayload) {
+          keepLocal = confirm("這台裝置有尚未上傳到 GitHub 的修改。\n\n按「確定」：保留此裝置的修改（自訂音訊使用 GitHub 上的版本）\n按「取消」：捨棄修改，改用 GitHub 上的CSV");
+        }
+        if (keepLocal) {
+          state.audioUrls.forEach(url => URL.revokeObjectURL(url));
+          state.audioUrls.clear();
+          state.config.customSounds = remote.customSounds;
+          applyAllConfig();
+          saveLocalBackup();
+        } else {
+          applyLoadedCsv(csv);
+        }
+        state.githubText = csv;
+        state.githubSignature = remoteSignature;
+        state.githubLoaded = true;
+        state.githubCheckedAt = Date.now();
+        githubSaveNow();
+        if (announce) showToast(keepLocal ? "已讀取 GitHub CSV，並保留此裝置的修改" : "已載入 GitHub 上的CSV");
+      } catch (error) {
+        state.githubLoaded = false;
+        updateDbStatus("ghError");
+        showToast(`GitHub CSV 讀取失敗：${error.message}`, 4800);
+      } finally { state.githubLoading = false; }
+    }
+
+    // 回到分頁時，若 GitHub 上的CSV已更新且此裝置沒有未上傳的修改，就自動載入。
+    async function checkGithubUpdate() {
+      if (!isGithubMode() || !state.githubLoaded || state.githubLoading || state.running) return;
+      if (Date.now() - state.githubCheckedAt < 30000) return;
+      if (dataSignature() !== state.githubSignature) return;
+      state.githubCheckedAt = Date.now();
+      try {
+        const csv = await fetchGithubCsv();
+        if (!isGithubMode() || csv === state.githubText || dataSignature() !== state.githubSignature) return;
+        await loadFromGithub(false);
+        showToast("已載入 GitHub 上的最新CSV");
+      } catch (_) { /* 下次再檢查 */ }
+    }
+
+    function openGithubUpload() {
+      downloadDatabase();
+      const url = githubUploadUrl();
+      if (url) window.open(url, "_blank", "noopener");
+      showToast(url ? "CSV已下載；請在開啟的 GitHub 頁面拖入檔案並 Commit（若分支不是 main 請自行切換）" : "CSV已下載；請到 GitHub 儲存庫上傳並覆蓋原本的CSV", 6000);
     }
 
     function connectCloudFromForm() {
@@ -2499,6 +2672,7 @@
     // 右上角資料庫按鈕
     function connectDatabase() {
       if (isLocalMode()) { void connectLocalFolder(); return; }
+      if (isGithubMode()) { void loadFromGithub(true); return; }
       if (!cloudConfigured()) {
         setEditing(true);
         switchTab("database");
@@ -2523,6 +2697,11 @@
       try {
         applyLoadedCsv(await file.text());
         state.lastSavedPayload = "";
+        if (isGithubMode()) {
+          githubSaveNow();
+          showToast("CSV設定已匯入到此裝置；要讓所有裝置套用，請下載並上傳到 GitHub", 5200);
+          return;
+        }
         if (isLocalMode()) {
           await saveNow();
           showToast(state.fileHandle ? "CSV設定已匯入並寫入本機CSV" : "CSV設定已匯入（尚未連結本機資料夾）", 3600);
@@ -2676,7 +2855,11 @@
       $("#connectDbButton").addEventListener("click", connectCloudFromForm);
       $("#connectLocalButton").addEventListener("click", () => { void connectLocalFolder(); });
       $$('input[name="storageMode"]').forEach(input => input.addEventListener("change", () => { if (input.checked) void setStorageMode(input.value); }));
-      $("#saveDbButton").addEventListener("click", async () => { await saveNow(); showToast(isLocalMode() ? (state.fileHandle ? "已儲存到本機CSV" : "尚未連結本機資料夾，已保存在此裝置") : (state.cloudReady ? "已儲存到雲端" : "尚未連線雲端，已保存在此裝置")); });
+      $("#saveDbButton").addEventListener("click", async () => { await saveNow(); showToast(isGithubMode() ? "已保存在此裝置（GitHub CSV 為唯讀，請下載後上傳）" : isLocalMode() ? (state.fileHandle ? "已儲存到本機CSV" : "尚未連結本機資料夾，已保存在此裝置") : (state.cloudReady ? "已儲存到雲端" : "尚未連線雲端，已保存在此裝置")); });
+      $("#loadGithubButton").addEventListener("click", () => { state.githubPath = $("#githubPath").value.trim(); writeStorageSettings(); renderSourceBanner(); void loadFromGithub(true); });
+      $("#githubPath").addEventListener("change", event => { state.githubPath = event.target.value.trim(); writeStorageSettings(); renderSourceBanner(); });
+      $("#openGithubUploadButton").addEventListener("click", openGithubUpload);
+      $("#localPathNote").addEventListener("input", event => { state.localPathNote = event.target.value; writeStorageSettings(); renderSourceBanner(); });
       $("#reloadCloudButton").addEventListener("click", () => { if (!cloudConfigured()) showToast("請先填入 Apps Script 網址與密碼"); else void loadFromCloud(true); });
       $("#downloadDbButton").addEventListener("click", downloadDatabase);
       $("#importCsvInput").addEventListener("change", event => { if (event.target.files[0]) importDatabase(event.target.files[0]); event.target.value = ""; });
@@ -2728,7 +2911,7 @@
         state.remainingMs = state.config.durationMs;
         state.totalMs = state.remainingMs;
         applyAllConfig(); saveLocalBackup();
-        if (isLocalMode()) scheduleSave(); else void syncAllToCloud();
+        if (isCloudMode()) void syncAllToCloud(); else scheduleSave();
         showToast("已恢復預設設定");
       });
       $$(".tab-btn").forEach(button => button.addEventListener("click", () => switchTab(button.dataset.tab)));
@@ -2770,12 +2953,12 @@
         if (event.key === "Enter" && elements.timeEditorOverlay.classList.contains("show") && event.target.matches("#directHours,#directMinutes,#directSeconds,#directMilliseconds")) applyDirectTime();
       });
       window.addEventListener("beforeunload", saveLocalBackup);
-      window.addEventListener("pagehide", () => { if (!isLocalMode() && state.cloudReady) void saveNow(); });
-      window.addEventListener("online", () => { if (isLocalMode()) return; if (state.cloudReady) void saveNow(); else if (cloudConfigured()) void loadFromCloud(false); });
-      window.addEventListener("focus", () => { void checkCloudUpdate(); });
+      window.addEventListener("pagehide", () => { if (isCloudMode() && state.cloudReady) void saveNow(); });
+      window.addEventListener("online", () => { if (isGithubMode()) { if (!state.githubLoaded) void loadFromGithub(false); return; } if (!isCloudMode()) return; if (state.cloudReady) void saveNow(); else if (cloudConfigured()) void loadFromCloud(false); });
+      window.addEventListener("focus", () => { void checkCloudUpdate(); void checkGithubUpdate(); });
       document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden" && !isLocalMode() && state.cloudReady) void saveNow();
-        if (document.visibilityState === "visible") void checkCloudUpdate();
+        if (document.visibilityState === "hidden" && isCloudMode() && state.cloudReady) void saveNow();
+        if (document.visibilityState === "visible") { void checkCloudUpdate(); void checkGithubUpdate(); }
       });
       const unlockAudio = () => { void ensureAudioContext(); };
       ["pointerdown", "keydown", "touchstart"].forEach(name => document.addEventListener(name, unlockAudio, { capture: true, passive: true }));
@@ -3107,13 +3290,17 @@
       const storageSettings = readStorageSettings();
       state.cloud = { url: storageSettings.url, key: storageSettings.key };
       state.cloudRev = storageSettings.rev;
-      state.storageMode = storageSettings.mode === "local" && localFolderSupported ? "local"
-        : storageSettings.mode === "cloud" ? "cloud"
-        : (!cloudConfigured() && localFolderSupported ? "local" : "cloud");
+      state.githubPath = storageSettings.githubPath;
+      state.localPathNote = storageSettings.localPathNote;
+      state.storageMode = STORAGE_MODES.includes(storageSettings.mode) ? storageSettings.mode : "github";
+      if (isLocalMode() && !localFolderSupported) state.storageMode = "github";
       $("#cloudUrl").value = state.cloud.url;
       $("#cloudKey").value = state.cloud.key;
+      $("#githubPath").value = state.githubPath;
+      $("#localPathNote").value = state.localPathNote;
       renderStorageMode();
-      if (isLocalMode()) { updateDbStatus("fsNone"); void restoreDirectoryHandle(); }
+      if (isGithubMode()) void loadFromGithub(false);
+      else if (isLocalMode()) { updateDbStatus("fsNone"); void restoreDirectoryHandle(); }
       else { updateDbStatus(cloudConfigured() ? "saving" : "local"); void loadFromCloud(false); }
       registerWebMcpTools();
       setInterval(() => { if (state.running && document.hidden) tick(performance.now()); }, 500);
