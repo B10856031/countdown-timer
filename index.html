@@ -29,6 +29,7 @@
       --button-radius:18px;
       --quick-size:20px;
       --action-size:24px;
+      --focus-size:24px;
       --font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
     }
     *{box-sizing:border-box}
@@ -61,7 +62,9 @@
     .quick-btn:active,.primary-btn:active,.focus-btn:active{transform:scale(.975)}
     .action-stack{display:flex;flex-direction:column;align-items:stretch;gap:12px;width:min(470px,78vw)}
     .primary-btn{padding:21px 34px;background:var(--accent);color:var(--primary-text);font-size:var(--action-size);box-shadow:0 14px 30px rgba(79,125,243,.25)}
-    .focus-btn{padding:15px 28px;background:var(--focus-bg);color:var(--focus-text);font-size:calc(var(--action-size) * .72)}
+    .focus-btn{padding:21px 34px;background:var(--focus-bg);color:var(--focus-text);font-size:var(--focus-size)}
+    #startButton,#focusButton{translate:var(--move-x,0px) var(--move-y,0px)}
+    body.editing .focus-btn.hidden{display:block!important;opacity:.62}
     .timer-card.style-border{box-shadow:none;border:3px solid var(--accent-soft)}
     .timer-card.style-flat{box-shadow:none;border:0}
     .timer-card.style-glass{background:color-mix(in srgb,var(--panel) 76%,transparent);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.8)}
@@ -280,9 +283,9 @@
         <button class="quick-btn" type="button">+15min</button>
         <button class="quick-btn" type="button">+50min</button>
       </div>
-      <div class="action-stack" id="actionStack" data-edit-key="actions">
-        <button class="focus-btn hidden" id="focusButton" type="button">專注倒數</button>
-        <button class="primary-btn" id="startButton" type="button">開始倒數</button>
+      <div class="action-stack" id="actionStack">
+        <button class="focus-btn hidden" id="focusButton" type="button" data-edit-key="focus">全螢幕倒數</button>
+        <button class="primary-btn" id="startButton" type="button" data-edit-key="start">開始倒數</button>
       </div>
       <div class="continuous-schedule hidden" id="continuousSchedule" data-edit-key="schedule" aria-label="連續倒數排程"></div>
     </section>
@@ -337,8 +340,8 @@
               <label class="color-field"><input id="primaryTextColor" type="color"><span>主要按鈕文字</span></label>
               <label class="color-field"><input id="quickColor" type="color"><span>快捷按鈕</span></label>
               <label class="color-field"><input id="quickTextColor" type="color"><span>快捷按鈕文字</span></label>
-              <label class="color-field"><input id="focusColor" type="color"><span>專注按鈕</span></label>
-              <label class="color-field"><input id="focusTextColor" type="color"><span>專注按鈕文字</span></label>
+              <label class="color-field"><input id="focusColor" type="color"><span>全螢幕倒數按鈕</span></label>
+              <label class="color-field"><input id="focusTextColor" type="color"><span>全螢幕倒數按鈕文字</span></label>
               <label class="color-field"><input id="progressTrackColor" type="color"><span>進度底色</span></label>
               <label class="color-field"><input id="dangerColor" type="color"><span>提醒顏色</span></label>
             </div>
@@ -353,14 +356,15 @@
             <label class="check-row"><span>顯示進度條下方文字</span><input id="showProgressText" type="checkbox"></label>
             <label class="check-row"><span>顯示進度條尾端圓形圖示</span><input id="showProgressMarker" type="checkbox"></label>
             <div class="field"><label for="quickButtonSize">快捷按鈕文字大小</label><div class="value-pair"><input id="quickButtonSize" type="range" min="14" max="36" step="1"><output id="quickButtonSizeValue">20px</output></div></div>
-            <div class="field"><label for="actionButtonSize">操作按鈕文字大小</label><div class="value-pair"><input id="actionButtonSize" type="range" min="16" max="42" step="1"><output id="actionButtonSizeValue">24px</output></div></div>
+            <div class="field"><label for="actionButtonSize">開始／結束按鈕文字大小</label><div class="value-pair"><input id="actionButtonSize" type="range" min="16" max="42" step="1"><output id="actionButtonSizeValue">24px</output></div></div>
+            <div class="field"><label for="focusButtonSize">全螢幕倒數按鈕文字大小</label><div class="value-pair"><input id="focusButtonSize" type="range" min="12" max="42" step="1"><output id="focusButtonSizeValue">24px</output></div></div>
             <div class="field"><label for="buttonRadius">按鈕圓角大小</label><div class="value-pair"><input id="buttonRadius" type="range" min="0" max="40" step="1"><output id="buttonRadiusValue">18px</output></div></div>
             <div class="field"><label for="startLabel">開始按鈕文字</label><input id="startLabel" type="text"></div>
             <div class="field"><label for="endLabel">結束按鈕文字</label><input id="endLabel" type="text"></div>
-            <div class="field"><label for="focusLabel">專注按鈕文字</label><input id="focusLabel" type="text"></div>
-            <label class="check-row"><span>開始時進入全螢幕</span><input id="autoFullscreen" type="checkbox"></label>
-            <label class="check-row"><span>開始時進入專注模式</span><input id="autoFocus" type="checkbox"></label>
-            <label class="check-row"><span>退出專注模式時暫停倒數（再次進入專注模式時繼續）</span><input id="pauseOnFocusExit" type="checkbox"></label>
+            <div class="field"><label for="focusLabel">全螢幕倒數按鈕文字</label><input id="focusLabel" type="text"></div>
+            <label class="check-row"><span>開始時讓瀏覽器全螢幕</span><input id="autoFullscreen" type="checkbox"></label>
+            <label class="check-row"><span>開始時進入全螢幕倒數畫面</span><input id="autoFocus" type="checkbox"></label>
+            <label class="check-row"><span>退出全螢幕倒數時暫停倒數（再次進入時繼續）</span><input id="pauseOnFocusExit" type="checkbox"></label>
             <label class="check-row"><span>歸零時畫面閃爍</span><input id="flashEnabled" type="checkbox"></label>
           </div>
           <div class="section" id="timeupTextSection">
@@ -387,7 +391,8 @@
             <h3>內建鈴聲</h3>
             <div class="field"><label for="builtinTone">預設鈴聲</label><select id="builtinTone"><option value="gentle">柔和提示音</option><option value="clear">清脆鈴聲</option><option value="double">雙音鈴</option><option value="alert">明顯警示音</option><option value="quizbell">搶答鈴聲</option><option value="servicebell">服務鈴</option></select></div>
             <p class="section-note">「服務鈴」依你提供的音檔頻譜重建，使用乾淨的金屬純音合成，不含錄音背景雜音，並可調整音高與單聲長度。</p>
-            <div class="field"><label for="toneVolume">音量</label><div class="value-pair"><input id="toneVolume" type="range" min="0" max="100" step="1"><output id="toneVolumeValue">55%</output></div></div>
+            <div class="field"><label for="toneVolume">音量（100%＝原始音量，最高1000%）</label><div class="value-pair"><input id="toneVolume" type="range" min="0" max="1000" step="5"><output id="toneVolumeValue">55%</output></div></div>
+            <p class="section-note" style="margin:-4px 0 10px">超過100%時會自動加上限幅保護，聲音更大但不易破音；內建鈴聲與自訂音訊都適用。</p>
             <div class="field"><label for="tonePitch">音高</label><div class="value-pair"><input id="tonePitch" type="range" min="220" max="1320" step="10"><output id="tonePitchValue">660Hz</output></div></div>
             <div class="field"><label for="toneDuration">單聲長度</label><div class="value-pair"><input id="toneDuration" type="range" min="80" max="1200" step="20"><output id="toneDurationValue">260ms</output></div></div>
             <button class="full-btn secondary" id="previewBuiltinButton" type="button">試聽內建鈴聲</button>
@@ -520,25 +525,25 @@
     const HANDLE_KEY = "databaseDirectory";
 
     const DEFAULT_CONFIG = {
-      version: 5,
+      version: 6,
       title: "剩餘時間",
       durationMs: 900000,
-      labels: { start: "開始倒數", end: "結束倒數", focus: "專注倒數" },
+      labels: { start: "開始倒數", end: "結束倒數", focus: "全螢幕倒數" },
       typography: { family: "sans", weight: 750, titleSize: 64, timeSize: 180, millisecondScale: 50, showMilliseconds: true, millisecondDigits: 3 },
       colors: {
         background: "#f4f8ff", panel: "#ffffff", title: "#17233c", time: "#17233c", milliseconds: "#4f7df3",
         accent: "#4f7df3", primaryText: "#ffffff", quick: "#e8efff", quickText: "#315fcf",
         focus: "#f1f5fb", focusText: "#17233c", progressTrack: "#e8edf5", danger: "#ec6269"
       },
-      panel: { style: "soft", radius: 34, width: 94, height: 86, progressHeight: 24, quickButtonSize: 20, actionButtonSize: 24, buttonRadius: 18 },
+      panel: { style: "soft", radius: 34, width: 94, height: 86, progressHeight: 24, quickButtonSize: 20, actionButtonSize: 24, focusButtonSize: 24, buttonRadius: 18 },
       progress: { showText: true, showMarker: true },
       timeup: { titleSize: 160, messageSize: 28, buttonSize: 19 },
       behavior: { autoFullscreen: true, autoFocus: true, flashEnabled: true, pauseOnFocusExit: true },
       positions: {
         panel: { x: 0, y: 0 }, title: { x: 0, y: 0 }, time: { x: 0, y: 0 },
-        progress: { x: 0, y: 0 }, quick: { x: 0, y: 0 }, actions: { x: 0, y: 0 }, schedule: { x: 0, y: 0 }
+        progress: { x: 0, y: 0 }, quick: { x: 0, y: 0 }, start: { x: 0, y: 0 }, focus: { x: 0, y: 0 }, schedule: { x: 0, y: 0 }
       },
-      blockStyles: { panel: {}, title: {}, time: {}, progress: {}, quick: {}, actions: {}, schedule: {} },
+      blockStyles: { panel: {}, title: {}, time: {}, progress: {}, quick: {}, start: {}, focus: {}, schedule: {} },
       quickButtons: [
         { id: "quick-1", label: "+1min", direction: "plus", amount: 1, unit: "minutes", deltaMs: 60000, enabled: true },
         { id: "quick-5", label: "+5min", direction: "plus", amount: 5, unit: "minutes", deltaMs: 300000, enabled: true },
@@ -596,6 +601,7 @@
         return { ...item, direction, amount, unit, enabled: item.enabled !== false, deltaMs: (direction === "minus" ? -1 : 1) * amount * unitFactor(unit) };
       });
       config.reminders = (config.reminders || []).map(normalizeReminder);
+      config.sound.volume = clamp(Number(config.sound.volume) || 0, 0, 1000);
       config.sound.endPlaybackRate = clamp(Number(config.sound.endPlaybackRate) || 1, .25, 4);
       config.typography.showMilliseconds = config.typography.showMilliseconds !== false;
       config.typography.millisecondDigits = clamp(Math.round(Number(config.typography.millisecondDigits) || 3), 1, 3);
@@ -610,6 +616,27 @@
       config.progress.showText = config.progress.showText !== false;
       config.progress.showMarker = config.progress.showMarker !== false;
       config.positions.schedule ||= { x: 0, y: 0 };
+      if (config.labels.focus === "專注倒數") config.labels.focus = "全螢幕倒數";
+      // 舊版「操作按鈕區」拆成「開始／結束按鈕」與「全螢幕倒數按鈕」
+      const isZeroPosition = value => !isPlainObject(value) || (!Number(value.x) && !Number(value.y));
+      const isEmptyStyle = value => !isPlainObject(value) || !Object.keys(value).length;
+      if (isPlainObject(config.positions.actions)) {
+        const legacyPosition = config.positions.actions;
+        if (isZeroPosition(config.positions.start)) config.positions.start = { x: Number(legacyPosition.x) || 0, y: Number(legacyPosition.y) || 0 };
+        if (isZeroPosition(config.positions.focus)) config.positions.focus = { x: Number(legacyPosition.x) || 0, y: Number(legacyPosition.y) || 0 };
+      }
+      if (!isPlainObject(config.positions.start)) config.positions.start = { x: 0, y: 0 };
+      if (!isPlainObject(config.positions.focus)) config.positions.focus = { x: 0, y: 0 };
+      delete config.positions.actions;
+      if (config.blockStyles && isPlainObject(config.blockStyles.actions)) {
+        const legacyStyle = config.blockStyles.actions;
+        if (isEmptyStyle(config.blockStyles.start)) config.blockStyles.start = { ...legacyStyle };
+        if (isEmptyStyle(config.blockStyles.focus)) config.blockStyles.focus = { ...legacyStyle };
+      }
+      if (config.blockStyles) delete config.blockStyles.actions;
+      config.panel.actionButtonSize = clamp(Number(config.panel.actionButtonSize) || 24, 16, 42);
+      if (sourceVersion < 6) config.panel.focusButtonSize = config.panel.actionButtonSize;
+      config.panel.focusButtonSize = clamp(Number(config.panel.focusButtonSize) || config.panel.actionButtonSize, 12, 42);
       config.blockStyles ||= clone(DEFAULT_CONFIG.blockStyles);
       Object.keys(DEFAULT_CONFIG.blockStyles).forEach(key => {
         if (!isPlainObject(config.blockStyles[key])) config.blockStyles[key] = {};
@@ -672,6 +699,7 @@
       focusFullscreen: false,
       previewingTimeup: false,
       paused: false,
+      soundOutput: null,
       starting: false,
       audioUrls: new Map(),
       alertTimers: [],
@@ -765,7 +793,7 @@
       const defaults = {
         panel: state.config.colors.time, title: state.config.colors.title, time: state.config.colors.time,
         progress: "#5f6f89", quick: state.config.colors.quickText,
-        actions: state.config.colors.primaryText, schedule: state.config.colors.quickText
+        start: state.config.colors.primaryText, focus: state.config.colors.focusText, schedule: state.config.colors.quickText
       };
       return defaults[key] || state.config.colors.time;
     }
@@ -776,7 +804,7 @@
       const defaults = {
         panel: 16, title: state.config.typography.titleSize, time: state.config.typography.timeSize,
         progress: 14, quick: state.config.panel.quickButtonSize,
-        actions: state.config.panel.actionButtonSize, schedule: 16
+        start: state.config.panel.actionButtonSize, focus: state.config.panel.focusButtonSize, schedule: 16
       };
       return defaults[key] || 16;
     }
@@ -792,16 +820,21 @@
         target.style.fontSize = style.fontSize ? `${style.fontSize}px` : "";
         target.style.backgroundColor = style.background || "";
         const descendants = key === "quick" ? $$(".quick-btn", target)
-          : key === "actions" ? $$(".primary-btn,.focus-btn", target)
           : key === "schedule" ? $$(".schedule-chip", target)
           : key === "progress" ? $$(".progress-meta", target) : [];
         descendants.forEach(item => {
           item.style.fontFamily = style.fontFamily ? familyValue(style.fontFamily) : "";
           item.style.fontWeight = style.fontWeight || "";
           item.style.color = style.fontColor || "";
-          item.style.fontSize = style.fontSize ? `${key === "actions" && item.classList.contains("focus-btn") ? style.fontSize * .72 : style.fontSize}px` : "";
+          item.style.fontSize = style.fontSize ? `${style.fontSize}px` : "";
         });
       });
+      paintStartButton();
+    }
+
+    function paintStartButton() {
+      const custom = (state.config.blockStyles.start || {}).background;
+      elements.startButton.style.background = custom || (state.running ? state.config.colors.danger : state.config.colors.accent);
     }
 
     function applyAppearance() {
@@ -823,6 +856,7 @@
       rootStyle.setProperty("--button-radius", `${config.panel.buttonRadius}px`);
       rootStyle.setProperty("--quick-size", `${config.panel.quickButtonSize}px`);
       rootStyle.setProperty("--action-size", `${config.panel.actionButtonSize}px`);
+      rootStyle.setProperty("--focus-size", `${config.panel.focusButtonSize}px`);
       rootStyle.setProperty("--title-size", `${config.typography.titleSize}px`);
       rootStyle.setProperty("--time-size", `${config.typography.timeSize}px`);
       rootStyle.setProperty("--ms-scale", config.typography.millisecondScale / 100);
@@ -993,9 +1027,9 @@
 
     function renderFeatureList() {
       const rows = [
-        { kind: "behavior", key: "autoFullscreen", label: "開始時進入全螢幕", checked: state.config.behavior.autoFullscreen, tab: "appearance", target: "autoFullscreen" },
-        { kind: "behavior", key: "autoFocus", label: "開始時進入專注模式", checked: state.config.behavior.autoFocus, tab: "appearance", target: "autoFocus" },
-        { kind: "behavior", key: "pauseOnFocusExit", label: "退出專注模式時暫停倒數", checked: state.config.behavior.pauseOnFocusExit, tab: "appearance", target: "pauseOnFocusExit" },
+        { kind: "behavior", key: "autoFullscreen", label: "開始時讓瀏覽器全螢幕", checked: state.config.behavior.autoFullscreen, tab: "appearance", target: "autoFullscreen" },
+        { kind: "behavior", key: "autoFocus", label: "開始時進入全螢幕倒數畫面", checked: state.config.behavior.autoFocus, tab: "appearance", target: "autoFocus" },
+        { kind: "behavior", key: "pauseOnFocusExit", label: "退出全螢幕倒數時暫停倒數", checked: state.config.behavior.pauseOnFocusExit, tab: "appearance", target: "pauseOnFocusExit" },
         { kind: "behavior", key: "flashEnabled", label: "歸零時畫面閃爍", checked: state.config.behavior.flashEnabled, tab: "appearance", target: "flashEnabled" },
         { kind: "typography", key: "showMilliseconds", label: "顯示毫秒", checked: state.config.typography.showMilliseconds, tab: "appearance", target: "showMilliseconds" },
         { kind: "progress", key: "showText", label: "顯示進度條下方文字", checked: state.config.progress.showText, tab: "appearance", target: "showProgressText" },
@@ -1122,6 +1156,7 @@
       setValue("progressHeight", config.panel.progressHeight);
       setValue("quickButtonSize", config.panel.quickButtonSize);
       setValue("actionButtonSize", config.panel.actionButtonSize);
+      setValue("focusButtonSize", config.panel.focusButtonSize);
       setValue("buttonRadius", config.panel.buttonRadius);
       setValue("startLabel", config.labels.start);
       setValue("endLabel", config.labels.end);
@@ -1156,13 +1191,14 @@
       updateOutput("progressHeightValue", `${config.panel.progressHeight}px`);
       updateOutput("quickButtonSizeValue", `${config.panel.quickButtonSize}px`);
       updateOutput("actionButtonSizeValue", `${config.panel.actionButtonSize}px`);
+      updateOutput("focusButtonSizeValue", `${config.panel.focusButtonSize}px`);
       updateOutput("buttonRadiusValue", `${config.panel.buttonRadius}px`);
       updateOutput("toneVolumeValue", `${config.sound.volume}%`);
       updateOutput("tonePitchValue", `${config.sound.pitch}Hz`);
       updateOutput("toneDurationValue", `${config.sound.duration}ms`);
     }
 
-    const selectedLabels = { panel: "整體區塊", title: "剩餘時間標題", time: "倒數數字", progress: "倒數進度條", quick: "快捷按鈕列", actions: "操作按鈕區", schedule: "連續倒數排程" };
+    const selectedLabels = { panel: "整體區塊", title: "剩餘時間標題", time: "倒數數字", progress: "倒數進度條", quick: "快捷按鈕列", start: "開始／結束倒數按鈕", focus: "全螢幕倒數按鈕", schedule: "連續倒數排程" };
     const contextRelatedTargets = {
       panel: [
         { label: "區塊樣式", tab: "appearance", target: "panelStyle" }, { label: "區塊顏色", tab: "appearance", target: "panelColor" },
@@ -1186,12 +1222,17 @@
         { label: "按鈕顏色", tab: "appearance", target: "quickColor" }, { label: "文字顏色", tab: "appearance", target: "quickTextColor" },
         { label: "按鈕圓角", tab: "appearance", target: "buttonRadius" }
       ],
-      actions: [
-        { label: "按鈕大小", tab: "appearance", target: "actionButtonSize" }, { label: "按鈕圓角", tab: "appearance", target: "buttonRadius" },
-        { label: "開始文字", tab: "appearance", target: "startLabel" }, { label: "結束文字", tab: "appearance", target: "endLabel" },
-        { label: "專注文字", tab: "appearance", target: "focusLabel" }, { label: "開始時專注", tab: "appearance", target: "autoFocus" },
-        { label: "退出專注時暫停", tab: "appearance", target: "pauseOnFocusExit" },
-        { label: "開始時全螢幕", tab: "appearance", target: "autoFullscreen" }
+      start: [
+        { label: "按鈕文字大小", tab: "appearance", target: "actionButtonSize" }, { label: "開始文字", tab: "appearance", target: "startLabel" },
+        { label: "結束文字", tab: "appearance", target: "endLabel" }, { label: "按鈕顏色", tab: "appearance", target: "accentColor" },
+        { label: "文字顏色", tab: "appearance", target: "primaryTextColor" }, { label: "結束時顏色", tab: "appearance", target: "dangerColor" },
+        { label: "按鈕圓角", tab: "appearance", target: "buttonRadius" }, { label: "開始時瀏覽器全螢幕", tab: "appearance", target: "autoFullscreen" }
+      ],
+      focus: [
+        { label: "按鈕文字大小", tab: "appearance", target: "focusButtonSize" }, { label: "按鈕文字", tab: "appearance", target: "focusLabel" },
+        { label: "按鈕顏色", tab: "appearance", target: "focusColor" }, { label: "文字顏色", tab: "appearance", target: "focusTextColor" },
+        { label: "按鈕圓角", tab: "appearance", target: "buttonRadius" }, { label: "開始時進入", tab: "appearance", target: "autoFocus" },
+        { label: "退出時暫停", tab: "appearance", target: "pauseOnFocusExit" }
       ],
       schedule: [
         { label: "連續排程", tab: "continuous", target: "continuousEditorList" }, { label: "啟用連續倒數", tab: "continuous", target: "continuousEnabled" },
@@ -1229,7 +1270,7 @@
 
     function syncContextToolbar(key = state.selectedKey) {
       const style = state.config.blockStyles[key] || {};
-      const isTransparent = style.background === "transparent" || (!style.background && key !== "panel");
+      const isTransparent = style.background === "transparent" || (!style.background && !["panel", "start", "focus"].includes(key));
       elements.contextTitle.textContent = `${selectedLabels[key] || "區塊"}快捷設定`;
       elements.contextFontColor.value = effectiveBlockFontColor(key);
       elements.contextFontSize.value = Math.round(effectiveBlockFontSize(key));
@@ -1238,7 +1279,7 @@
       elements.contextMoveX.value = state.config.positions[key].x;
       elements.contextMoveY.value = state.config.positions[key].y;
       elements.contextBackgroundTransparent.checked = isTransparent;
-      elements.contextBackgroundColor.value = style.background && style.background !== "transparent" ? style.background : key === "panel" ? state.config.colors.panel : "#ffffff";
+      elements.contextBackgroundColor.value = style.background && style.background !== "transparent" ? style.background : key === "panel" ? state.config.colors.panel : key === "start" ? state.config.colors.accent : key === "focus" ? state.config.colors.focus : "#ffffff";
       elements.contextBackgroundColor.disabled = isTransparent;
       elements.contextRelatedLinks.innerHTML = (contextRelatedTargets[key] || []).map((destination, index) =>
         `<button class="context-link" type="button" data-context-destination="${index}">${escapeHtml(destination.label)}</button>`
@@ -1337,7 +1378,7 @@
       document.body.classList.toggle("paused", state.running && state.paused);
       elements.focusButton.textContent = state.paused ? `${state.config.labels.focus}（繼續）` : state.config.labels.focus;
       elements.startButton.textContent = state.running ? state.config.labels.end : state.config.labels.start;
-      elements.startButton.style.background = state.running ? state.config.colors.danger : state.config.colors.accent;
+      paintStartButton();
       elements.focusButton.classList.toggle("hidden", !state.running);
       elements.settingsButton.disabled = false;
     }
@@ -1519,7 +1560,7 @@
         try {
           document.documentElement.requestFullscreen()
             .then(() => { state.focusFullscreen = true; })
-            .catch(() => showToast("瀏覽器未允許全螢幕，請再點一次「專注倒數」"));
+            .catch(() => showToast(`瀏覽器未允許全螢幕，請再點一次「${state.config.labels.focus}」`));
         } catch (_) { /* Fullscreen unsupported. */ }
       }
       clearTimeout(state.focusListenerTimer);
@@ -1694,11 +1735,28 @@
         const gain = context.createGain();
         oscillator.frequency.value = 30;
         gain.gain.value = .00002;
-        oscillator.connect(gain).connect(context.destination);
+        oscillator.connect(gain).connect(getSoundOutput(context));
         oscillator.start();
         state.audioKeepAlive = { oscillator, gain };
       } catch (_) { /* Keep-alive is optional. */ }
     }
+
+    // 所有鈴聲的輸出總線：音量放大後經過限幅器，避免破音。
+    function getSoundOutput(context) {
+      if (state.soundOutput && state.soundOutput.context === context) return state.soundOutput.input;
+      const input = context.createGain();
+      const limiter = context.createDynamicsCompressor();
+      limiter.threshold.value = -3;
+      limiter.knee.value = 4;
+      limiter.ratio.value = 20;
+      limiter.attack.value = .002;
+      limiter.release.value = .12;
+      input.connect(limiter).connect(context.destination);
+      state.soundOutput = { context, input };
+      return input;
+    }
+
+    const soundVolume = () => clamp(Number(state.config.sound.volume) || 0, 0, 1000) / 100;
 
     function firstStrikeTime(context) {
       return Math.max(context.currentTime + .05, state.audioReadyAt);
@@ -1724,7 +1782,7 @@
     // 在 AudioContext 時間軸的 startAt 排程一聲內建鈴聲，回傳該聲長度（秒）。
     function scheduleBuiltinStrike(context, kind, playbackRate, startAt) {
       const speed = clamp(Number(playbackRate) || 1, .25, 4);
-      const volume = clamp(state.config.sound.volume, 0, 100) / 100;
+      const volume = soundVolume();
       const start = Math.max(context.currentTime, startAt);
 
       if (kind === "servicebell") {
@@ -1761,7 +1819,7 @@
           gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * partial.level), attackEnd);
           gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * partial.level * partial.tail), decayAt);
           gain.gain.exponentialRampToValueAtTime(.0001, releaseAt);
-          oscillator.connect(gain).connect(context.destination);
+          oscillator.connect(gain).connect(getSoundOutput(context));
           oscillator.start(at);
           oscillator.stop(releaseAt + .025);
           trackAudioNode(oscillator, gain);
@@ -1789,7 +1847,7 @@
           gain.gain.setValueAtTime(.0001, at);
           gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * partial.level), at + .006 / speed);
           gain.gain.exponentialRampToValueAtTime(.0001, releaseAt);
-          oscillator.connect(gain).connect(context.destination);
+          oscillator.connect(gain).connect(getSoundOutput(context));
           oscillator.start(at);
           oscillator.stop(releaseAt + .025);
           trackAudioNode(oscillator, gain);
@@ -1809,7 +1867,7 @@
         gain.gain.setValueAtTime(.0001, at);
         gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * .22), at + .025 / speed);
         gain.gain.exponentialRampToValueAtTime(.0001, at + duration);
-        oscillator.connect(gain).connect(context.destination);
+        oscillator.connect(gain).connect(getSoundOutput(context));
         oscillator.start(at);
         oscillator.stop(at + duration + .03);
         trackAudioNode(oscillator, gain);
@@ -1843,12 +1901,31 @@
       try {
         const audio = new Audio(await getCustomSoundUrl(sound));
         if (generation !== state.soundGeneration) return;
-        audio.volume = clamp(state.config.sound.volume, 0, 100) / 100;
+        const volume = soundVolume();
         audio.playbackRate = clamp(Number(playbackRate) || 1, .25, 4);
+        let route = null;
+        const context = volume > 1 ? await ensureAudioContext() : null;
+        if (context && context.state === "running") {
+          try {
+            const source = context.createMediaElementSource(audio);
+            const gain = context.createGain();
+            gain.gain.value = volume;
+            source.connect(gain).connect(getSoundOutput(context));
+            audio.volume = 1;
+            route = { source, gain };
+          } catch (_) { route = null; }
+        }
+        if (!route) audio.volume = Math.min(1, volume);
         state.activeAudios.add(audio);
         await new Promise(resolve => {
           let finished = false;
-          const finish = () => { if (finished) return; finished = true; state.activeAudios.delete(audio); resolve(); };
+          const finish = () => {
+            if (finished) return;
+            finished = true;
+            state.activeAudios.delete(audio);
+            if (route) { try { route.source.disconnect(); route.gain.disconnect(); } catch (_) { /* Already disconnected. */ } }
+            resolve();
+          };
           audio.addEventListener("ended", finish, { once: true });
           audio.addEventListener("error", finish, { once: true });
           audio.addEventListener("pause", () => { if (generation !== state.soundGeneration) finish(); }, { once: true });
@@ -2536,6 +2613,7 @@
         ["progressHeight", "input", value => state.config.panel.progressHeight = Number(value)],
         ["quickButtonSize", "input", value => state.config.panel.quickButtonSize = Number(value)],
         ["actionButtonSize", "input", value => state.config.panel.actionButtonSize = Number(value)],
+        ["focusButtonSize", "input", value => state.config.panel.focusButtonSize = Number(value)],
         ["buttonRadius", "input", value => state.config.panel.buttonRadius = Number(value)],
         ["startLabel", "input", value => state.config.labels.start = value],
         ["endLabel", "input", value => state.config.labels.end = value],
