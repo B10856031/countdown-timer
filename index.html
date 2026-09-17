@@ -225,6 +225,8 @@
       body.editing .quick-btn:hover{transform:none}
     }
     .icon-btn:active,.small-btn:active,.tiny-btn:not(:disabled):active,.full-btn:active,.context-actions button:active,.context-link:active,.timeup-content button:active,.time-editor-actions button:active,.schedule-chip:active{transform:scale(.97);box-shadow:none}
+    body.paused .time-display > span{opacity:.45}
+    body.paused .time-display::after{content:"已暫停";display:block;margin-top:.35em;font-size:max(16px,.14em);letter-spacing:.2em;font-weight:800;color:var(--danger)}
     .no-transition *{transition:none!important}
     @media(max-width:760px){
       .app{padding:80px 14px 20px}
@@ -358,6 +360,7 @@
             <div class="field"><label for="focusLabel">專注按鈕文字</label><input id="focusLabel" type="text"></div>
             <label class="check-row"><span>開始時進入全螢幕</span><input id="autoFullscreen" type="checkbox"></label>
             <label class="check-row"><span>開始時進入專注模式</span><input id="autoFocus" type="checkbox"></label>
+            <label class="check-row"><span>退出專注模式時暫停倒數（再次進入專注模式時繼續）</span><input id="pauseOnFocusExit" type="checkbox"></label>
             <label class="check-row"><span>歸零時畫面閃爍</span><input id="flashEnabled" type="checkbox"></label>
           </div>
           <div class="section" id="timeupTextSection">
@@ -530,7 +533,7 @@
       panel: { style: "soft", radius: 34, width: 94, height: 86, progressHeight: 24, quickButtonSize: 20, actionButtonSize: 24, buttonRadius: 18 },
       progress: { showText: true, showMarker: true },
       timeup: { titleSize: 160, messageSize: 28, buttonSize: 19 },
-      behavior: { autoFullscreen: true, autoFocus: true, flashEnabled: true },
+      behavior: { autoFullscreen: true, autoFocus: true, flashEnabled: true, pauseOnFocusExit: true },
       positions: {
         panel: { x: 0, y: 0 }, title: { x: 0, y: 0 }, time: { x: 0, y: 0 },
         progress: { x: 0, y: 0 }, quick: { x: 0, y: 0 }, actions: { x: 0, y: 0 }, schedule: { x: 0, y: 0 }
@@ -598,6 +601,7 @@
       config.typography.millisecondDigits = clamp(Math.round(Number(config.typography.millisecondDigits) || 3), 1, 3);
       config.colors.milliseconds ||= config.colors.accent;
       config.behavior.autoFocus = sourceVersion < 4 ? true : Boolean(config.behavior.autoFocus);
+      config.behavior.pauseOnFocusExit = config.behavior.pauseOnFocusExit !== false;
       config.progress ||= clone(DEFAULT_CONFIG.progress);
       config.timeup = isPlainObject(config.timeup) ? config.timeup : clone(DEFAULT_CONFIG.timeup);
       config.timeup.titleSize = clamp(Number(config.timeup.titleSize) || DEFAULT_CONFIG.timeup.titleSize, 32, 360);
@@ -667,6 +671,7 @@
       audioKeepAlive: null,
       focusFullscreen: false,
       previewingTimeup: false,
+      paused: false,
       starting: false,
       audioUrls: new Map(),
       alertTimers: [],
@@ -990,6 +995,7 @@
       const rows = [
         { kind: "behavior", key: "autoFullscreen", label: "開始時進入全螢幕", checked: state.config.behavior.autoFullscreen, tab: "appearance", target: "autoFullscreen" },
         { kind: "behavior", key: "autoFocus", label: "開始時進入專注模式", checked: state.config.behavior.autoFocus, tab: "appearance", target: "autoFocus" },
+        { kind: "behavior", key: "pauseOnFocusExit", label: "退出專注模式時暫停倒數", checked: state.config.behavior.pauseOnFocusExit, tab: "appearance", target: "pauseOnFocusExit" },
         { kind: "behavior", key: "flashEnabled", label: "歸零時畫面閃爍", checked: state.config.behavior.flashEnabled, tab: "appearance", target: "flashEnabled" },
         { kind: "typography", key: "showMilliseconds", label: "顯示毫秒", checked: state.config.typography.showMilliseconds, tab: "appearance", target: "showMilliseconds" },
         { kind: "progress", key: "showText", label: "顯示進度條下方文字", checked: state.config.progress.showText, tab: "appearance", target: "showProgressText" },
@@ -1122,6 +1128,7 @@
       setValue("focusLabel", config.labels.focus);
       setChecked("autoFullscreen", config.behavior.autoFullscreen);
       setChecked("autoFocus", config.behavior.autoFocus);
+      setChecked("pauseOnFocusExit", config.behavior.pauseOnFocusExit);
       setChecked("flashEnabled", config.behavior.flashEnabled);
       setChecked("showProgressText", config.progress.showText);
       setChecked("showProgressMarker", config.progress.showMarker);
@@ -1183,6 +1190,7 @@
         { label: "按鈕大小", tab: "appearance", target: "actionButtonSize" }, { label: "按鈕圓角", tab: "appearance", target: "buttonRadius" },
         { label: "開始文字", tab: "appearance", target: "startLabel" }, { label: "結束文字", tab: "appearance", target: "endLabel" },
         { label: "專注文字", tab: "appearance", target: "focusLabel" }, { label: "開始時專注", tab: "appearance", target: "autoFocus" },
+        { label: "退出專注時暫停", tab: "appearance", target: "pauseOnFocusExit" },
         { label: "開始時全螢幕", tab: "appearance", target: "autoFullscreen" }
       ],
       schedule: [
@@ -1324,7 +1332,10 @@
     }
 
     function updateRunControls() {
-      document.body.classList.toggle("counting", state.running);
+      if (!state.running) state.paused = false;
+      document.body.classList.toggle("counting", state.running && !state.paused);
+      document.body.classList.toggle("paused", state.running && state.paused);
+      elements.focusButton.textContent = state.paused ? `${state.config.labels.focus}（繼續）` : state.config.labels.focus;
       elements.startButton.textContent = state.running ? state.config.labels.end : state.config.labels.start;
       elements.startButton.style.background = state.running ? state.config.colors.danger : state.config.colors.accent;
       elements.focusButton.classList.toggle("hidden", !state.running);
@@ -1367,6 +1378,7 @@
       } finally { state.starting = false; }
       if (state.running) return;
       state.running = true;
+      state.paused = false;
       if (!continuation) state.completedContinuousIds.clear();
       state.totalMs = state.remainingMs;
       state.previousRemainingMs = state.remainingMs;
@@ -1394,7 +1406,7 @@
     }
 
     function tick(now = performance.now()) {
-      if (!state.running) return;
+      if (!state.running || state.paused) return;
       const nextRemaining = Math.max(0, state.endAt - now);
       checkReminders(state.previousRemainingMs, nextRemaining);
       state.previousRemainingMs = nextRemaining;
@@ -1474,8 +1486,33 @@
       showToast("倒數時間已更新");
     }
 
+    function pauseCountdown() {
+      if (!state.running || state.paused) return;
+      const now = performance.now();
+      const remaining = Math.max(0, state.endAt - now);
+      checkReminders(state.previousRemainingMs, remaining);
+      state.remainingMs = remaining;
+      state.previousRemainingMs = remaining;
+      cancelAnimationFrame(state.raf);
+      state.paused = true;
+      releaseWakeLock();
+      renderTime();
+      updateRunControls();
+      showToast(`倒數已暫停，按「${state.config.labels.focus}」繼續`, 3200);
+    }
+
+    function resumeCountdown() {
+      if (!state.running || !state.paused) return;
+      state.paused = false;
+      state.endAt = performance.now() + state.remainingMs;
+      requestWakeLock();
+      updateRunControls();
+      tick();
+    }
+
     function enterFocusMode() {
       if (!state.running) return;
+      resumeCountdown();
       setEditing(false);
       document.body.classList.add("focus-mode");
       if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
@@ -1493,6 +1530,7 @@
       event.preventDefault();
       event.stopPropagation();
       exitFocusMode();
+      if (state.config.behavior.pauseOnFocusExit) pauseCountdown();
       if (state.focusFullscreen && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
       state.focusFullscreen = false;
       const suppressClick = clickEvent => { clickEvent.preventDefault(); clickEvent.stopPropagation(); };
@@ -2519,6 +2557,11 @@
       });
       $("#autoFullscreen").addEventListener("change", event => { state.config.behavior.autoFullscreen = event.target.checked; renderFeatureList(); scheduleSave(); });
       $("#autoFocus").addEventListener("change", event => { state.config.behavior.autoFocus = event.target.checked; renderFeatureList(); scheduleSave(); });
+      $("#pauseOnFocusExit").addEventListener("change", event => {
+        state.config.behavior.pauseOnFocusExit = event.target.checked;
+        if (!event.target.checked && state.paused) resumeCountdown();
+        renderFeatureList(); scheduleSave();
+      });
       $("#flashEnabled").addEventListener("change", event => { state.config.behavior.flashEnabled = event.target.checked; renderFeatureList(); scheduleSave(); });
       $("#showMilliseconds").addEventListener("change", event => { state.config.typography.showMilliseconds = event.target.checked; applyAppearance(); renderTime(); renderFeatureList(); scheduleSave(); });
       $("#showProgressText").addEventListener("change", event => { state.config.progress.showText = event.target.checked; applyAppearance(); renderFeatureList(); scheduleSave(); });
@@ -2664,7 +2707,10 @@
       document.addEventListener("fullscreenchange", () => {
         if (!document.fullscreenElement) {
           state.focusFullscreen = false;
-          if (document.body.classList.contains("focus-mode")) exitFocusMode();
+          if (document.body.classList.contains("focus-mode")) {
+            exitFocusMode();
+            if (state.config.behavior.pauseOnFocusExit) pauseCountdown();
+          }
         }
       });
       bindAppearanceInputs();
@@ -2758,7 +2804,10 @@
       const input = event.target.closest("[data-feature-kind]");
       if (!input) return;
       const kind = input.dataset.featureKind;
-      if (kind === "behavior") state.config.behavior[input.dataset.featureKey] = input.checked;
+      if (kind === "behavior") {
+        state.config.behavior[input.dataset.featureKey] = input.checked;
+        if (input.dataset.featureKey === "pauseOnFocusExit" && !input.checked && state.paused) resumeCountdown();
+      }
       else if (kind === "typography") state.config.typography[input.dataset.featureKey] = input.checked;
       else if (kind === "progress") state.config.progress[input.dataset.featureKey] = input.checked;
       else if (kind === "continuous") state.config.continuous[input.dataset.featureKey] = input.checked;
