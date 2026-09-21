@@ -396,22 +396,24 @@
           <div class="section">
             <h3>內建鈴聲</h3>
             <div class="field"><label for="builtinTone">預設鈴聲</label><select id="builtinTone"><option value="gentle">柔和提示音</option><option value="clear">清脆鈴聲</option><option value="double">雙音鈴</option><option value="alert">明顯警示音</option><option value="quizbell">搶答鈴聲</option><option value="servicebell">服務鈴</option></select></div>
-            <p class="section-note">「服務鈴」依你提供的音檔頻譜重建，使用乾淨的金屬純音合成，不含錄音背景雜音，並可調整音高與單聲長度。</p>
-            <div class="field"><label for="toneVolume">音量（100%＝原始音量，最高1000%）</label><div class="value-pair"><input id="toneVolume" type="range" min="0" max="1000" step="5"><output id="toneVolumeValue">55%</output></div></div>
+            <p class="section-note">下面的音量、音高、單聲長度是針對上方選擇的鈴聲<b>各自儲存</b>，切換鈴聲時會載入該鈴聲自己的設定。<br>「服務鈴」依你提供的音檔頻譜重建，使用乾淨的金屬純音合成，不含錄音背景雜音，並可調整音高與單聲長度。</p>
+            <div class="field"><label for="toneVolume">此鈴聲的音量（100%＝原始音量，最高1000%）</label><div class="value-pair"><input id="toneVolume" type="range" min="0" max="1000" step="5"><output id="toneVolumeValue">55%</output></div></div>
             <p class="section-note" style="margin:-4px 0 10px">超過100%時會自動加上限幅保護，聲音更大但不易破音；內建鈴聲與自訂音訊都適用。</p>
-            <div class="field"><label for="tonePitch">音高</label><div class="value-pair"><input id="tonePitch" type="range" min="220" max="1320" step="10"><output id="tonePitchValue">660Hz</output></div></div>
-            <div class="field"><label for="toneDuration">單聲長度</label><div class="value-pair"><input id="toneDuration" type="range" min="80" max="1200" step="20"><output id="toneDurationValue">260ms</output></div></div>
+            <div class="field"><label for="tonePitch">此鈴聲的音高</label><div class="value-pair"><input id="tonePitch" type="range" min="220" max="1320" step="10"><output id="tonePitchValue">660Hz</output></div></div>
+            <div class="field"><label for="toneDuration">此鈴聲的單聲長度</label><div class="value-pair"><input id="toneDuration" type="range" min="80" max="1200" step="20"><output id="toneDurationValue">260ms</output></div></div>
             <button class="full-btn secondary" id="previewBuiltinButton" type="button">試聽內建鈴聲</button>
           </div>
           <div class="section">
             <h3>自訂音訊庫</h3>
             <p class="section-note">支援常見音訊格式，單檔建議不超過8MB（雲端模式上限8MB）。音訊會編碼後存入CSV。</p>
+            <div class="field"><label for="customVolume">自訂音訊音量（100%＝原始音量，最高1000%）</label><div class="value-pair"><input id="customVolume" type="range" min="0" max="1000" step="5"><output id="customVolumeValue">55%</output></div></div>
             <label class="upload-box">＋上傳自訂音訊<input id="soundUpload" type="file" accept="audio/*" multiple></label>
             <div id="customSoundList"></div>
           </div>
           <div class="section">
             <h3>歸零提醒</h3>
             <div class="field"><label for="endSoundSelect">歸零鈴聲</label><select id="endSoundSelect"></select></div>
+            <p class="section-note" style="margin:-4px 0 10px">選「不播放（無鈴聲）」時，時間到仍會顯示提醒畫面，只是不發出聲音。連續倒數各項的完成響鈴也有同樣選項。</p>
             <div class="field-row">
               <div class="field"><label for="endRepeat">響鈴次數</label><input id="endRepeat" type="number" min="1" max="20"></div>
               <div class="field"><label for="endInterval">響鈴間隔（秒）</label><input id="endInterval" type="number" min="0.1" max="10" step="0.1"></div>
@@ -541,7 +543,7 @@
     const HANDLE_KEY = "databaseDirectory";
 
     const DEFAULT_CONFIG = {
-      version: 6,
+      version: 7,
       title: "剩餘時間",
       durationMs: 900000,
       labels: { start: "開始倒數", end: "結束倒數", focus: "全螢幕倒數" },
@@ -567,7 +569,15 @@
         { id: "quick-50", label: "+50min", direction: "plus", amount: 50, unit: "minutes", deltaMs: 3000000, enabled: true }
       ],
       sound: {
-        builtinTone: "gentle", volume: 55, pitch: 660, duration: 260,
+        builtinTone: "gentle", customVolume: 55,
+        tones: {
+          gentle: { volume: 55, pitch: 660, duration: 260 },
+          clear: { volume: 55, pitch: 660, duration: 260 },
+          double: { volume: 55, pitch: 660, duration: 260 },
+          alert: { volume: 55, pitch: 660, duration: 260 },
+          quizbell: { volume: 55, pitch: 660, duration: 260 },
+          servicebell: { volume: 55, pitch: 660, duration: 260 }
+        },
         endSound: "builtin:gentle", endRepeat: 3, endIntervalMs: 900, endPlaybackRate: 1
       },
       reminders: [],
@@ -617,7 +627,28 @@
         return { ...item, direction, amount, unit, enabled: item.enabled !== false, deltaMs: (direction === "minus" ? -1 : 1) * amount * unitFactor(unit) };
       });
       config.reminders = (config.reminders || []).map(normalizeReminder);
-      config.sound.volume = clamp(Number(config.sound.volume) || 0, 0, 1000);
+      // 舊版是所有內建鈴聲共用一組音量／音高／長度，改版後每個鈴聲各自保存。
+      const legacyTone = {
+        volume: Number(config.sound.volume), pitch: Number(config.sound.pitch), duration: Number(config.sound.duration)
+      };
+      config.sound.tones = isPlainObject(config.sound.tones) ? config.sound.tones : {};
+      BUILTIN_TONES.forEach(kind => {
+        const base = isPlainObject(config.sound.tones[kind]) ? config.sound.tones[kind] : {};
+        const fallback = DEFAULT_CONFIG.sound.tones[kind];
+        const useLegacy = sourceVersion > 0 && sourceVersion < 7;
+        config.sound.tones[kind] = {
+          volume: clamp(Number(useLegacy && Number.isFinite(legacyTone.volume) ? legacyTone.volume : base.volume ?? fallback.volume) || 0, 0, 1000),
+          pitch: clamp(Number(useLegacy && Number.isFinite(legacyTone.pitch) ? legacyTone.pitch : base.pitch ?? fallback.pitch) || fallback.pitch, 220, 1320),
+          duration: clamp(Number(useLegacy && Number.isFinite(legacyTone.duration) ? legacyTone.duration : base.duration ?? fallback.duration) || fallback.duration, 80, 1200)
+        };
+      });
+      config.sound.customVolume = clamp(Number(
+        sourceVersion > 0 && sourceVersion < 7 && Number.isFinite(legacyTone.volume) ? legacyTone.volume : config.sound.customVolume ?? 55
+      ) || 0, 0, 1000);
+      if (!BUILTIN_TONES.includes(config.sound.builtinTone)) config.sound.builtinTone = "gentle";
+      delete config.sound.volume;
+      delete config.sound.pitch;
+      delete config.sound.duration;
       config.sound.endPlaybackRate = clamp(Number(config.sound.endPlaybackRate) || 1, .25, 4);
       config.typography.showMilliseconds = config.typography.showMilliseconds !== false;
       config.typography.millisecondDigits = clamp(Math.round(Number(config.typography.millisecondDigits) || 3), 1, 3);
@@ -679,6 +710,7 @@
       }));
       return config;
     }
+    const BUILTIN_TONES = ["gentle", "clear", "double", "alert", "quizbell", "servicebell"];
     const escapeHtml = value => String(value).replace(/[&<>"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]);
     const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
     const uniqueId = prefix => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -994,6 +1026,7 @@
 
     function soundOptions(selected) {
       const builtin = [
+        ["none", "不播放（無鈴聲）"],
         ["builtin:gentle", "內建－柔和提示音"], ["builtin:clear", "內建－清脆鈴聲"],
         ["builtin:double", "內建－雙音鈴"], ["builtin:alert", "內建－明顯警示音"],
         ["builtin:quizbell", "內建－搶答鈴聲"], ["builtin:servicebell", "內建－服務鈴"]
@@ -1009,7 +1042,8 @@
     }
 
     function soundChoiceExists(choice) {
-      if (String(choice).startsWith("builtin:")) return ["gentle", "clear", "double", "alert", "quizbell", "servicebell"].includes(String(choice).split(":")[1]);
+      if (choice === "none") return true;
+      if (String(choice).startsWith("builtin:")) return BUILTIN_TONES.includes(String(choice).split(":")[1]);
       if (String(choice).startsWith("custom:")) return state.config.customSounds.some(sound => sound.id === String(choice).slice(7));
       return false;
     }
@@ -1192,9 +1226,11 @@
       setChecked("showProgressMarker", config.progress.showMarker);
       setChecked("continuousEnabled", config.continuous.enabled);
       setValue("builtinTone", config.sound.builtinTone);
-      setValue("toneVolume", config.sound.volume);
-      setValue("tonePitch", config.sound.pitch);
-      setValue("toneDuration", config.sound.duration);
+      const activeTone = currentTone();
+      setValue("toneVolume", activeTone.volume);
+      setValue("tonePitch", activeTone.pitch);
+      setValue("toneDuration", activeTone.duration);
+      setValue("customVolume", config.sound.customVolume);
       setValue("timeupTitleSize", config.timeup.titleSize);
       setValue("timeupMessageSize", config.timeup.messageSize);
       setValue("timeupButtonSize", config.timeup.buttonSize);
@@ -1216,9 +1252,10 @@
       updateOutput("actionButtonSizeValue", `${config.panel.actionButtonSize}px`);
       updateOutput("focusButtonSizeValue", `${config.panel.focusButtonSize}px`);
       updateOutput("buttonRadiusValue", `${config.panel.buttonRadius}px`);
-      updateOutput("toneVolumeValue", `${config.sound.volume}%`);
-      updateOutput("tonePitchValue", `${config.sound.pitch}Hz`);
-      updateOutput("toneDurationValue", `${config.sound.duration}ms`);
+      updateOutput("toneVolumeValue", `${activeTone.volume}%`);
+      updateOutput("tonePitchValue", `${activeTone.pitch}Hz`);
+      updateOutput("toneDurationValue", `${activeTone.duration}ms`);
+      updateOutput("customVolumeValue", `${config.sound.customVolume}%`);
     }
 
     const selectedLabels = { panel: "整體區塊", title: "剩餘時間標題", time: "倒數數字", progress: "倒數進度條", quick: "快捷按鈕列", start: "開始／結束倒數按鈕", focus: "全螢幕倒數按鈕", schedule: "連續倒數排程" };
@@ -1779,7 +1816,19 @@
       return input;
     }
 
-    const soundVolume = () => clamp(Number(state.config.sound.volume) || 0, 0, 1000) / 100;
+    // 每個內建鈴聲各自保存音量／音高／單聲長度。
+    function toneSettings(kind) {
+      const fallback = DEFAULT_CONFIG.sound.tones[kind] || DEFAULT_CONFIG.sound.tones.gentle;
+      const tone = (state.config.sound.tones || {})[BUILTIN_TONES.includes(kind) ? kind : "gentle"] || {};
+      return {
+        volume: clamp(Number(tone.volume ?? fallback.volume) || 0, 0, 1000),
+        pitch: clamp(Number(tone.pitch ?? fallback.pitch) || fallback.pitch, 220, 1320),
+        duration: clamp(Number(tone.duration ?? fallback.duration) || fallback.duration, 80, 1200)
+      };
+    }
+
+    const currentTone = () => toneSettings(state.config.sound.builtinTone);
+    const customVolume = () => clamp(Number(state.config.sound.customVolume) || 0, 0, 1000) / 100;
 
     function firstStrikeTime(context) {
       return Math.max(context.currentTime + .05, state.audioReadyAt);
@@ -1805,12 +1854,13 @@
     // 在 AudioContext 時間軸的 startAt 排程一聲內建鈴聲，回傳該聲長度（秒）。
     function scheduleBuiltinStrike(context, kind, playbackRate, startAt) {
       const speed = clamp(Number(playbackRate) || 1, .25, 4);
-      const volume = soundVolume();
+      const tone = toneSettings(kind);
+      const volume = tone.volume / 100;
       const start = Math.max(context.currentTime, startAt);
 
       if (kind === "servicebell") {
-        const pitchScale = clamp(state.config.sound.pitch / 660, .5, 2);
-        const ringDuration = clamp(state.config.sound.duration * 4.5, 700, 1700) / 1000 / speed;
+        const pitchScale = clamp(tone.pitch / 660, .5, 2);
+        const ringDuration = clamp(tone.duration * 4.5, 700, 1700) / 1000 / speed;
         const partials = [
           { hz: 4805, level: .2, decay: 1, tail: .045 },
           { hz: 2695, level: .095, decay: 1.04, tail: .07 },
@@ -1851,8 +1901,8 @@
       }
 
       if (kind === "quizbell") {
-        const baseFrequency = clamp(state.config.sound.pitch * 1.05, 260, 1600);
-        const ringDuration = clamp(state.config.sound.duration * 3, 360, 1800) / 1000 / speed;
+        const baseFrequency = clamp(tone.pitch * 1.05, 260, 1600);
+        const ringDuration = clamp(tone.duration * 3, 360, 1800) / 1000 / speed;
         const partials = [
           { ratio: 1, level: .3, decay: 1, type: "sine" },
           { ratio: 1.49, level: .19, decay: .76, type: "triangle" },
@@ -1880,13 +1930,13 @@
 
       const patterns = { gentle: [1, 1.25], clear: [1], double: [1, 1.34], alert: [1, .82, 1.16] };
       const pattern = patterns[kind] || patterns.gentle;
-      const duration = clamp(state.config.sound.duration, 80, 1200) / 1000 / speed;
+      const duration = clamp(tone.duration, 80, 1200) / 1000 / speed;
       pattern.forEach((factor, index) => {
         const oscillator = context.createOscillator();
         const gain = context.createGain();
         const at = start + index * (duration + .06 / speed);
         oscillator.type = kind === "gentle" ? "sine" : kind === "alert" ? "square" : "triangle";
-        oscillator.frequency.setValueAtTime(clamp(state.config.sound.pitch * factor, 100, 3000), at);
+        oscillator.frequency.setValueAtTime(clamp(tone.pitch * factor, 100, 3000), at);
         gain.gain.setValueAtTime(.0001, at);
         gain.gain.exponentialRampToValueAtTime(Math.max(.0001, volume * .22), at + .025 / speed);
         gain.gain.exponentialRampToValueAtTime(.0001, at + duration);
@@ -1924,7 +1974,7 @@
       try {
         const audio = new Audio(await getCustomSoundUrl(sound));
         if (generation !== state.soundGeneration) return;
-        const volume = soundVolume();
+        const volume = customVolume();
         audio.playbackRate = clamp(Number(playbackRate) || 1, .25, 4);
         let route = null;
         const context = volume > 1 ? await ensureAudioContext() : null;
@@ -1970,6 +2020,7 @@
     // overlap 為 true 時不會先停止正在播放的聲音（用於快速連點試聽）。
     function playSoundChoice(choice, repeat = 1, intervalMs = 800, playbackRate = 1, overlap = false) {
       if (!overlap) stopAllAudio();
+      if (String(choice || "") === "none") return;
       const count = clamp(Number(repeat) || 1, 1, 20);
       const interval = clamp(Number(intervalMs) || 800, 100, 10000);
       const speed = clamp(Number(playbackRate) || 1, .25, 4);
@@ -2003,6 +2054,12 @@
           scheduleBuiltinStrike(context, kind, speed, base + index * interval / 1000);
         }
       })();
+    }
+
+    // 試聽用：選「無鈴聲」時給提示，而不是安靜地什麼都沒發生。
+    function previewSoundChoice(choice, repeat = 1, intervalMs = 800, playbackRate = 1) {
+      if (String(choice || "") === "none") { stopAllAudio(); showToast("此項目設定為無鈴聲"); return; }
+      playSoundChoice(choice, repeat, intervalMs, playbackRate);
     }
 
     function stopScheduledAudio() {
@@ -2764,6 +2821,11 @@
       tools.forEach(tool => { try { void Promise.resolve(context.registerTool(tool)).catch(() => {}); } catch (_) { /* Optional browser capability. */ } });
     }
 
+    function setToneField(field, value) {
+      const kind = BUILTIN_TONES.includes(state.config.sound.builtinTone) ? state.config.sound.builtinTone : "gentle";
+      state.config.sound.tones[kind] = { ...toneSettings(kind), [field]: value };
+    }
+
     function bindAppearanceInputs() {
       const bindings = [
         ["fontFamily", "change", value => state.config.typography.family = value],
@@ -2801,9 +2863,10 @@
         ["timeupMessageSize", "input", value => state.config.timeup.messageSize = clamp(Number(value) || 28, 14, 120)],
         ["timeupButtonSize", "input", value => state.config.timeup.buttonSize = clamp(Number(value) || 19, 14, 72)],
         ["builtinTone", "change", value => state.config.sound.builtinTone = value],
-        ["toneVolume", "input", value => state.config.sound.volume = Number(value)],
-        ["tonePitch", "input", value => state.config.sound.pitch = Number(value)],
-        ["toneDuration", "input", value => state.config.sound.duration = Number(value)],
+        ["toneVolume", "input", value => setToneField("volume", clamp(Number(value) || 0, 0, 1000))],
+        ["tonePitch", "input", value => setToneField("pitch", clamp(Number(value) || 660, 220, 1320))],
+        ["toneDuration", "input", value => setToneField("duration", clamp(Number(value) || 260, 80, 1200))],
+        ["customVolume", "input", value => state.config.sound.customVolume = clamp(Number(value) || 0, 0, 1000)],
         ["endRepeat", "input", value => state.config.sound.endRepeat = clamp(Number(value) || 1, 1, 20)],
         ["endInterval", "input", value => state.config.sound.endIntervalMs = clamp((Number(value) || .1) * 1000, 100, 10000)],
         ["endPlaybackRate", "input", value => state.config.sound.endPlaybackRate = clamp(Number(value) || 1, .25, 4)]
@@ -2865,7 +2928,7 @@
       $("#importCsvInput").addEventListener("change", event => { if (event.target.files[0]) importDatabase(event.target.files[0]); event.target.value = ""; });
       $("#soundUpload").addEventListener("change", event => { handleSoundUpload(event.target.files); event.target.value = ""; });
       $("#previewBuiltinButton").addEventListener("click", () => playSoundChoice(`builtin:${state.config.sound.builtinTone}`, 1, 800, 1, true));
-      $("#previewEndSoundButton").addEventListener("click", () => playSoundChoice(state.config.sound.endSound, state.config.sound.endRepeat, state.config.sound.endIntervalMs, state.config.sound.endPlaybackRate));
+      $("#previewEndSoundButton").addEventListener("click", () => previewSoundChoice(state.config.sound.endSound, state.config.sound.endRepeat, state.config.sound.endIntervalMs, state.config.sound.endPlaybackRate));
       $("#addReminderButton").addEventListener("click", addReminder);
       $("#previewTimeupButton").addEventListener("click", () => {
         if (elements.timeupOverlay.classList.contains("show")) return;
@@ -3034,7 +3097,7 @@
       if (!button || !card) return;
       const reminder = state.config.reminders.find(item => item.id === card.dataset.reminderId);
       if (!reminder) return;
-      if (button.dataset.reminderAction === "preview") playSoundChoice(reminder.sound, reminder.repeat, reminder.intervalMs, reminder.playbackRate || 1);
+      if (button.dataset.reminderAction === "preview") previewSoundChoice(reminder.sound, reminder.repeat, reminder.intervalMs, reminder.playbackRate || 1);
       else {
         state.config.reminders = state.config.reminders.filter(item => item.id !== reminder.id);
         renderReminders(); renderFeatureList(); scheduleSave();
@@ -3179,14 +3242,14 @@
       if (reminderButton) {
         const reminder = continuousReminderFromEvent(event, item);
         if (!reminder) return;
-        if (reminderButton.dataset.continuousReminderAction === "preview") playSoundChoice(reminder.sound, reminder.repeat, reminder.intervalMs, reminder.playbackRate || 1);
+        if (reminderButton.dataset.continuousReminderAction === "preview") previewSoundChoice(reminder.sound, reminder.repeat, reminder.intervalMs, reminder.playbackRate || 1);
         else { item.reminders = item.reminders.filter(entry => entry.id !== reminder.id); renderContinuousEditor(); scheduleSave(); }
         return;
       }
       const button = event.target.closest("[data-continuous-action]");
       if (!button) return;
       const action = button.dataset.continuousAction;
-      if (action === "preview") playSoundChoice(item.sound, item.repeat, item.intervalMs, item.playbackRate);
+      if (action === "preview") previewSoundChoice(item.sound, item.repeat, item.intervalMs, item.playbackRate);
       else if (action === "select") selectContinuousIndex(index, false);
       else if (action === "toggleReminders") { item.expanded = !item.expanded; renderContinuousEditor(); }
       else if (action === "addReminder") {
