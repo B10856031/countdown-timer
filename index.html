@@ -583,7 +583,7 @@
       reminders: [],
       customSounds: [],
       continuous: {
-        enabled: true, uninterrupted: true, autoDismiss: false, autoDismissSeconds: 5, items: []
+        enabled: true, uninterrupted: true, autoDismiss: false, autoDismissSeconds: 5, resetAfterFinish: false, items: []
       }
     };
 
@@ -698,6 +698,7 @@
       config.continuous.enabled = config.continuous.enabled !== false;
       config.continuous.uninterrupted = config.continuous.uninterrupted !== false;
       config.continuous.autoDismiss = Boolean(config.continuous.autoDismiss);
+      config.continuous.resetAfterFinish = Boolean(config.continuous.resetAfterFinish);
       config.continuous.autoDismissSeconds = clamp(Number(config.continuous.autoDismissSeconds) || 5, .5, 300);
       config.continuous.items = (config.continuous.items || []).map((item, index) => ({
         id: item.id || uniqueId("continuous"), name: item.name || `倒數${index + 1}`,
@@ -1093,6 +1094,7 @@
         { kind: "progress", key: "showMarker", label: "顯示進度條尾端圓形圖示", checked: state.config.progress.showMarker, tab: "appearance", target: "showProgressMarker" },
         { kind: "continuous", key: "enabled", label: "連續倒數功能", checked: state.config.continuous.enabled, tab: "continuous", target: "continuousEnabled" },
         { kind: "continuous", key: "uninterrupted", label: "連續倒數不間斷", checked: state.config.continuous.uninterrupted, tab: "features", target: "feature-continuous-uninterrupted" },
+        { kind: "continuous", key: "resetAfterFinish", label: "連續倒數完成並退出後，初始化倒數", checked: state.config.continuous.resetAfterFinish, tab: "features", target: "feature-continuous-resetAfterFinish" },
         { kind: "continuous", key: "autoDismiss", label: "連續倒數間自動關閉【關閉提醒】", checked: state.config.continuous.autoDismiss, tab: "features", target: "feature-continuous-autoDismiss" }
       ];
       state.config.quickButtons.forEach(item => rows.push({ kind: "quick", id: item.id, label: `快捷按鈕：${item.label}`, checked: item.enabled, tab: "quick", target: `quick-${item.id}` }));
@@ -1296,7 +1298,8 @@
       ],
       schedule: [
         { label: "連續排程", tab: "continuous", target: "continuousEditorList" }, { label: "啟用連續倒數", tab: "continuous", target: "continuousEnabled" },
-        { label: "不間斷倒數", tab: "features", target: "feature-continuous-uninterrupted" }, { label: "自動關閉提醒", tab: "features", target: "feature-continuous-autoDismiss" }
+        { label: "不間斷倒數", tab: "features", target: "feature-continuous-uninterrupted" }, { label: "自動關閉提醒", tab: "features", target: "feature-continuous-autoDismiss" },
+        { label: "完成後初始化", tab: "features", target: "feature-continuous-resetAfterFinish" }
       ]
     };
 
@@ -1750,6 +1753,17 @@
       if (next) startNextContinuous(next.index);
       else if (state.running && state.config.behavior.autoFocus) setTimeout(enterFocusMode, 180);
       if (!state.running && !next && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      if (!next && !state.running) resetContinuousAfterFinish();
+    }
+
+    // 最後一個連續倒數完成並關閉提醒後，把畫面切回第一個連續倒數。
+    function resetContinuousAfterFinish() {
+      if (!state.config.continuous.resetAfterFinish || !state.config.continuous.enabled) return;
+      const first = enabledContinuousEntries()[0];
+      if (!first) return;
+      const alreadyAtStart = state.continuousIndex === first.index && !state.completedContinuousIds.size;
+      selectContinuousIndex(first.index, false);
+      if (!alreadyAtStart) showToast(`已回到第一個連續倒數：${first.item.name}`);
     }
 
     function checkReminders(previous, current) {
